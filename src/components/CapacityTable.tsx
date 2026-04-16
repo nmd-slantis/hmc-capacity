@@ -128,7 +128,7 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
             <thead>
               {/* Row 1 — month labels */}
               <tr className="bg-[#202022] text-white">
-                <th colSpan={6} className="px-3 py-2 text-left border-r-2 border-gray-500" />
+                <th colSpan={7} className="px-3 py-2 text-left border-r-2 border-gray-500" />
                 {VISIBLE_MONTHS.map((m, i) => (
                   <th
                     key={m.key}
