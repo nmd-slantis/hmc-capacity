@@ -44,7 +44,25 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-      <table className="min-w-full border-collapse text-xs">
+      <table
+        className="border-collapse text-xs"
+        style={{ tableLayout: "fixed", width: "100%", minWidth: "1620px" }}
+      >
+        {/* Fixed column widths — keeps sticky header aligned with body */}
+        <colgroup>
+          <col style={{ width: "220px" }} />
+          <col style={{ width: "50px" }} />
+          <col style={{ width: "95px" }} />
+          <col style={{ width: "95px" }} />
+          <col style={{ width: "60px" }} />
+          <col style={{ width: "50px" }} />
+          {VISIBLE_MONTHS.map((m) => (
+            <React.Fragment key={m.key}>
+              <col style={{ width: "48px" }} />
+              <col style={{ width: "40px" }} />
+            </React.Fragment>
+          ))}
+        </colgroup>
 
         {/* ── Sticky header ────────────────────────────────────────────── */}
         <thead className="sticky top-0 z-10">
