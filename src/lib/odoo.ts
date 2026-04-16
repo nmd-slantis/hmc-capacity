@@ -23,7 +23,7 @@ async function authenticate(): Promise<number> {
         params: {
           db: process.env.ODOO_DB,
           login: process.env.ODOO_USERNAME,
-          password: process.env.ODOO_PASSWORD,
+          password: process.env.ODOO_API_KEY,  // API key used as password
         },
       }),
       cache: "no-store",

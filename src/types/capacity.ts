@@ -12,4 +12,6 @@ export interface CapacityRow {
   so: string | null;          // Sales Order number (Odoo only)
   monthlyData: Record<string, number>;  // { "aug-25": 80, "sep-25": 172, ... } hours
   status: RowStatus;
+  hsPipeline: string | null;  // HubSpot pipeline ID (hubspot rows only)
+  hsStage: string | null;     // HubSpot dealstage ID (hubspot rows only)
 }

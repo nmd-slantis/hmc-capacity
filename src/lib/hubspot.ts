@@ -89,16 +89,6 @@ export async function fetchHubspotDeals(): Promise<HubspotDeal[]> {
     allDeals.push(...(data.results ?? []));
   }
 
-  // Filter: exclude Closed Won stage + Service Pipeline
-  // IDs are set via env vars — hit /api/hubspot/pipelines to discover them.
-  const closedWonId = process.env.HUBSPOT_CLOSED_WON_STAGE_ID ?? "";
-  const servicePipelineId = process.env.HUBSPOT_SERVICE_PIPELINE_ID ?? "";
-
-  return allDeals.filter((d) => {
-    const stage = d.properties.dealstage ?? "";
-    const pipeline = d.properties.pipeline ?? "";
-    if (closedWonId && stage === closedWonId) return false;
-    if (servicePipelineId && pipeline === servicePipelineId) return false;
-    return true;
-  });
+  // No filtering — all deals shown, color-coded by pipeline/stage in the UI.
+  return allDeals;
 }

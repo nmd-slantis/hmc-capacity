@@ -16,6 +16,17 @@ const STATUS_ROW_CLASS: Record<string, string> = {
   undated: "bg-white border-gray-100",
 };
 
+const HS_SERVICE_PIPELINE = "673846910";
+const HS_CLOSED_WON_STAGES = new Set(["closedwon", "969753704"]); // Closed won + Handover
+const HS_CLOSED_LOST_STAGE = "closedlost";
+
+function hsRowClass(pipeline: string | null, stage: string | null): string {
+  if (pipeline === HS_SERVICE_PIPELINE) return "bg-orange-50 border-orange-100";
+  if (stage && HS_CLOSED_WON_STAGES.has(stage))  return "bg-teal-50 border-teal-100";
+  if (stage === HS_CLOSED_LOST_STAGE)             return "bg-slate-50 border-slate-200 opacity-60";
+  return "bg-amber-50 border-amber-100"; // active sales pipeline
+}
+
 const SOURCE_BADGE: Record<string, { bg: string; label: string }> = {
   odoo:     { bg: "bg-purple-100 text-purple-700", label: "Odoo" },
   hubspot:  { bg: "bg-orange-100 text-orange-700", label: "HS" },
@@ -36,7 +47,9 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
     }));
   };
 
-  const rowClass = STATUS_ROW_CLASS[row.status] ?? "bg-white border-gray-100";
+  const rowClass = row.source === "hubspot"
+    ? hsRowClass(row.hsPipeline, row.hsStage)
+    : STATUS_ROW_CLASS[row.status] ?? "bg-white border-gray-100";
   const badge = SOURCE_BADGE[row.source];
 
   return (

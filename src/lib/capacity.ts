@@ -69,6 +69,8 @@ export async function buildCapacityRows(): Promise<CapacityRow[]> {
       so: extractSoNumber(p),
       monthlyData: manual?.monthlyData ?? {},
       status: computeStatus(startDate, endDate),
+      hsPipeline: null,
+      hsStage: null,
     });
   }
 
@@ -94,6 +96,8 @@ export async function buildCapacityRows(): Promise<CapacityRow[]> {
       so: null,
       monthlyData: manual?.monthlyData ?? {},
       status: computeStatus(startDate, endDate),
+      hsPipeline: d.properties.pipeline ?? null,
+      hsStage: d.properties.dealstage ?? null,
     });
   }
 
