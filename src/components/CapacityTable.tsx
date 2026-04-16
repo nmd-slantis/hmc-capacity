@@ -42,10 +42,13 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
               <th
                 key={m.key}
                 colSpan={2}
-                className="px-1 py-2 text-center font-semibold border-l border-gray-700 text-[11px] whitespace-nowrap"
+                className="px-2 py-2 border-l border-gray-700 text-[11px] whitespace-nowrap"
                 style={{ fontFamily: "Space Grotesk, sans-serif" }}
               >
-                {m.label}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold">{m.label}</span>
+                  <span className="text-gray-400 font-normal">{m.workdayHours} hs</span>
+                </div>
               </th>
             ))}
           </tr>

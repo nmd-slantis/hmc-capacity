@@ -127,7 +127,7 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
       {/* Monthly columns — 2 sub-cols per month: hours (editable) + FTE (calculated) */}
       {VISIBLE_MONTHS.map((month) => {
         const hours = row.monthlyData[month.key] ?? 0;
-        const fte = hours > 0 ? hoursToFte(hours) : null;
+        const fte = hours > 0 ? hoursToFte(hours, month.workdayHours) : null;
 
         return (
           <React.Fragment key={month.key}>

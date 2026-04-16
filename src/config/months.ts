@@ -1,32 +1,31 @@
 export interface MonthConfig {
-  key: string;      // e.g. "aug-25" — used as DB key in monthlyData JSON
-  label: string;    // e.g. "Aug 25" — shown in column header
-  hidden?: boolean; // if true, column is not rendered (data is still preserved)
+  key: string;           // e.g. "aug-25" — used as DB key in monthlyData JSON
+  label: string;         // e.g. "Aug 25" — shown in column header
+  workdayHours: number;  // Mon-Fri calendar days × 8 h (adjust for holidays as needed)
+  hidden?: boolean;      // if true, column is not rendered (data is still preserved)
 }
 
 // To add a month: append one entry to this array.
 // To hide a month: add hidden: true (data is preserved, just not displayed).
+// Adjust workdayHours when local holidays reduce the available working time.
 // No other file needs to change.
 export const MONTHS: MonthConfig[] = [
-  { key: "aug-25", label: "Aug 25" },
-  { key: "sep-25", label: "Sep 25" },
-  { key: "oct-25", label: "Oct 25" },
-  { key: "nov-25", label: "Nov 25" },
-  { key: "dec-25", label: "Dec 25" },
-  { key: "jan-26", label: "Jan 26" },
-  { key: "feb-26", label: "Feb 26" },
-  { key: "mar-26", label: "Mar 26" },
-  { key: "apr-26", label: "Apr 26" },
-  { key: "may-26", label: "May 26" },
-  { key: "jun-26", label: "Jun 26" },
-  { key: "jul-26", label: "Jul 26" },
+  { key: "aug-25", label: "Aug 25", workdayHours: 168 }, // 21 days
+  { key: "sep-25", label: "Sep 25", workdayHours: 176 }, // 22 days
+  { key: "oct-25", label: "Oct 25", workdayHours: 184 }, // 23 days
+  { key: "nov-25", label: "Nov 25", workdayHours: 160 }, // 20 days
+  { key: "dec-25", label: "Dec 25", workdayHours: 184 }, // 23 days
+  { key: "jan-26", label: "Jan 26", workdayHours: 176 }, // 22 days
+  { key: "feb-26", label: "Feb 26", workdayHours: 160 }, // 20 days
+  { key: "mar-26", label: "Mar 26", workdayHours: 176 }, // 22 days
+  { key: "apr-26", label: "Apr 26", workdayHours: 176 }, // 22 days
+  { key: "may-26", label: "May 26", workdayHours: 168 }, // 21 days
+  { key: "jun-26", label: "Jun 26", workdayHours: 176 }, // 22 days
+  { key: "jul-26", label: "Jul 26", workdayHours: 184 }, // 23 days
 ];
 
 export const VISIBLE_MONTHS = MONTHS.filter((m) => !m.hidden);
 
-// Standard monthly hours used to calculate FTE
-export const MONTHLY_HOURS = 172;
-
-export function hoursToFte(hours: number): number {
-  return Math.round((hours / MONTHLY_HOURS) * 10) / 10;
+export function hoursToFte(hours: number, monthHours: number): number {
+  return Math.round((hours / monthHours) * 10) / 10;
 }
