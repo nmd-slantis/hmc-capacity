@@ -3,6 +3,35 @@ import { fetchHubspotDeals } from "./hubspot";
 import { prisma } from "./prisma";
 import type { CapacityRow, RowStatus } from "@/types/capacity";
 
+const HS_SERVICE_PIPELINE = "673846910";
+const HS_CLOSED_WON_STAGES = new Set(["closedwon", "969753704"]);
+const HS_CLOSED_LOST_STAGE = "closedlost";
+
+function hsGroup(pipeline: string | null, stage: string | null): string {
+  if (pipeline === HS_SERVICE_PIPELINE) return "Service Pipeline";
+  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Closed Won";
+  if (stage === HS_CLOSED_LOST_STAGE) return "Closed Lost";
+  return "Sales Pipeline";
+}
+
+const ODOO_GROUP: Record<RowStatus, string> = {
+  ongoing: "Ongoing",
+  todo:    "To-Do",
+  done:    "Completed",
+  undated: "No Dates",
+};
+
+const GROUP_ORDER: Record<string, number> = {
+  "Ongoing":          0,
+  "Service Pipeline": 1,
+  "To-Do":            2,
+  "Sales Pipeline":   3,
+  "Closed Won":       4,
+  "Completed":        5,
+  "Closed Lost":      6,
+  "No Dates":         7,
+};
+
 function computeStatus(start: string | null, end: string | null): RowStatus {
   if (!start && !end) return "undated";
   const today = new Date();
@@ -59,6 +88,7 @@ export async function buildCapacityRows(): Promise<CapacityRow[]> {
     const startDate = isoDate(p.date_start);
     const endDate = isoDate(p.date);
 
+    const status = computeStatus(startDate, endDate);
     rows.push({
       id,
       source: "odoo",
@@ -68,9 +98,10 @@ export async function buildCapacityRows(): Promise<CapacityRow[]> {
       effort: manual?.effort ?? null,
       so: extractSoNumber(p),
       monthlyData: manual?.monthlyData ?? {},
-      status: computeStatus(startDate, endDate),
+      status,
       hsPipeline: null,
       hsStage: null,
+      group: ODOO_GROUP[status],
     });
   }
 
@@ -86,6 +117,8 @@ export async function buildCapacityRows(): Promise<CapacityRow[]> {
       ? manual.endDate.toISOString().substring(0, 10)
       : null;
 
+    const hsPipeline = d.properties.pipeline ?? null;
+    const hsStage = d.properties.dealstage ?? null;
     rows.push({
       id,
       source: "hubspot",
@@ -96,19 +129,13 @@ export async function buildCapacityRows(): Promise<CapacityRow[]> {
       so: null,
       monthlyData: manual?.monthlyData ?? {},
       status: computeStatus(startDate, endDate),
-      hsPipeline: d.properties.pipeline ?? null,
-      hsStage: d.properties.dealstage ?? null,
+      hsPipeline,
+      hsStage,
+      group: hsGroup(hsPipeline, hsStage),
     });
   }
 
-  // Sort by status: ongoing → todo → done → undated
-  const ORDER: Record<string, number> = {
-    ongoing: 0,
-    todo: 1,
-    done: 2,
-    undated: 3,
-  };
-  rows.sort((a, b) => ORDER[a.status] - ORDER[b.status]);
+  rows.sort((a, b) => (GROUP_ORDER[a.group] ?? 99) - (GROUP_ORDER[b.group] ?? 99));
 
   return rows;
 }

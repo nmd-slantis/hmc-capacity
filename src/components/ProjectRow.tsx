@@ -132,7 +132,7 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
         return (
           <React.Fragment key={month.key}>
             {/* Hours — editable */}
-            <td className="px-1 py-1 text-right border-l border-gray-100">
+            <td className={`px-1 py-1 text-right ${month.quarterStart ? "border-l-2 border-gray-300" : "border-l border-gray-100"}`}>
               <EditableCell
                 rowId={row.id}
                 field={month.key}

@@ -3,46 +3,42 @@
 import React from "react";
 import { VISIBLE_MONTHS } from "@/config/months";
 import { ProjectRow } from "./ProjectRow";
-import type { CapacityRow, RowStatus } from "@/types/capacity";
+import type { CapacityRow } from "@/types/capacity";
 
 interface CapacityTableProps {
   initialRows: CapacityRow[];
 }
 
-const SECTION_LABELS: Record<RowStatus, { label: string; emoji: string; color: string }> = {
-  ongoing: { label: "Ongoing",   emoji: "🔵", color: "text-blue-700 bg-blue-50" },
-  todo:    { label: "To-Do",     emoji: "⚪", color: "text-gray-600 bg-gray-50" },
-  done:    { label: "Completed", emoji: "🟢", color: "text-green-700 bg-green-50" },
-  undated: { label: "No Dates",  emoji: "⬜", color: "text-gray-400 bg-white" },
-};
-
-const STATUS_ORDER: RowStatus[] = ["ongoing", "todo", "done", "undated"];
-
 export function CapacityTable({ initialRows }: CapacityTableProps) {
-  // Group rows by status
-  const grouped = STATUS_ORDER.reduce(
-    (acc, status) => {
-      acc[status] = initialRows.filter((r) => r.status === status);
-      return acc;
-    },
-    {} as Record<RowStatus, CapacityRow[]>
-  );
+  // Group rows by their precomputed group label, preserving sort order
+  const groups: { label: string; rows: CapacityRow[] }[] = [];
+  for (const row of initialRows) {
+    const last = groups[groups.length - 1];
+    if (last && last.label === row.group) {
+      last.rows.push(row);
+    } else {
+      groups.push({ label: row.group, rows: [row] });
+    }
+  }
 
-  // Total columns: name, source, start, finish, effort, SO, + 2 per visible month
   const totalCols = 6 + VISIBLE_MONTHS.length * 2;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="min-w-full border-collapse text-xs">
         <thead>
-          {/* Month group headers — span 2 sub-columns each */}
+          {/* Month group headers */}
           <tr className="bg-[#202022] text-white">
             <th colSpan={6} className="px-3 py-2 text-left" />
             {VISIBLE_MONTHS.map((m) => (
               <th
                 key={m.key}
                 colSpan={2}
-                className="px-2 py-2 border-l border-gray-700 text-[11px] whitespace-nowrap"
+                className={`px-2 py-2 text-[11px] whitespace-nowrap ${
+                  m.quarterStart
+                    ? "border-l-2 border-gray-500"
+                    : "border-l border-gray-700"
+                }`}
                 style={{ fontFamily: "Space Grotesk, sans-serif" }}
               >
                 <div className="flex items-center justify-between gap-3">
@@ -53,7 +49,7 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
             ))}
           </tr>
 
-          {/* Column sub-headers */}
+          {/* Sub-headers */}
           <tr className="bg-[#2e2e30] text-gray-300 text-[10px] uppercase tracking-wider">
             <th className="px-3 py-1.5 text-left min-w-[200px]">Project / Deal</th>
             <th className="px-2 py-1.5 text-center">Src</th>
@@ -63,14 +59,12 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
             <th className="px-2 py-1.5 text-center min-w-[40px]">SO</th>
             {VISIBLE_MONTHS.map((m) => (
               <React.Fragment key={m.key}>
-                <th
-                  className="px-1 py-1.5 text-right min-w-[44px] border-l border-gray-700"
-                >
+                <th className={`px-1 py-1.5 text-right min-w-[44px] ${
+                  m.quarterStart ? "border-l-2 border-gray-600" : "border-l border-gray-700"
+                }`}>
                   h
                 </th>
-                <th
-                  className="px-1 py-1.5 text-right min-w-[36px] bg-gray-800/40"
-                >
+                <th className="px-1 py-1.5 text-right min-w-[36px] bg-gray-800/40">
                   FTE
                 </th>
               </React.Fragment>
@@ -79,39 +73,29 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
         </thead>
 
         <tbody>
-          {STATUS_ORDER.map((status) => {
-            const rows = grouped[status];
-            if (!rows.length) return null;
+          {groups.map(({ label, rows }) => (
+            <React.Fragment key={label}>
+              {/* Group header */}
+              <tr>
+                <td
+                  colSpan={totalCols}
+                  className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-widest text-gray-500 bg-gray-50 border-t border-gray-200"
+                  style={{ fontFamily: "Space Grotesk, sans-serif" }}
+                >
+                  {label} <span className="font-normal text-gray-400">({rows.length})</span>
+                </td>
+              </tr>
 
-            const { label, emoji, color } = SECTION_LABELS[status];
-
-            return (
-              <React.Fragment key={status}>
-                {/* Section header row */}
-                <tr>
-                  <td
-                    colSpan={totalCols}
-                    className={`px-4 py-1.5 font-semibold text-[11px] uppercase tracking-widest ${color}`}
-                    style={{ fontFamily: "Space Grotesk, sans-serif" }}
-                  >
-                    {emoji} {label} ({rows.length})
-                  </td>
-                </tr>
-
-                {rows.map((row) => (
-                  <ProjectRow key={row.id} initialRow={row} />
-                ))}
-              </React.Fragment>
-            );
-          })}
+              {rows.map((row) => (
+                <ProjectRow key={row.id} initialRow={row} />
+              ))}
+            </React.Fragment>
+          ))}
 
           {initialRows.length === 0 && (
             <tr>
-              <td
-                colSpan={totalCols}
-                className="text-center py-16 text-gray-400"
-              >
-                No projects or deals found. Check your API credentials. 🤔
+              <td colSpan={totalCols} className="text-center py-16 text-gray-400">
+                No projects or deals found. Check your API credentials.
               </td>
             </tr>
           )}
