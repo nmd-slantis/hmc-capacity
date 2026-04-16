@@ -130,7 +130,7 @@ export function EditableCell({
           if (e.key === "Escape") cancel();
         }}
         className={`w-full border border-[#FF7700] rounded px-1 py-0.5 text-xs outline-none bg-orange-50 ${className}`}
-        style={{ minWidth: "48px" }}
+        style={{ boxSizing: "border-box" }}
       />
     );
   }
