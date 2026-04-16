@@ -1,9 +1,17 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { VISIBLE_MONTHS } from "@/config/months";
 import { ProjectRow } from "./ProjectRow";
 import type { CapacityRow } from "@/types/capacity";
+
+function SearchIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+      <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
+    </svg>
+  );
+}
 
 interface CapacityTableProps {
   initialRows: CapacityRow[];
@@ -22,6 +30,18 @@ const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
 
 export function CapacityTable({ initialRows }: CapacityTableProps) {
   const totalCols = 6 + VISIBLE_MONTHS.length * 2;
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+  };
 
   if (initialRows.length === 0) {
     return (
@@ -31,9 +51,16 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
     );
   }
 
+  // Filter by search query
+  const filtered = searchQuery.trim()
+    ? initialRows.filter((r) =>
+        r.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
+      )
+    : initialRows;
+
   // Group rows by their precomputed group label, preserving sort order
   const groups: { label: string; rows: CapacityRow[] }[] = [];
-  for (const row of initialRows) {
+  for (const row of filtered) {
     const last = groups[groups.length - 1];
     if (last && last.label === row.group) {
       last.rows.push(row);
@@ -92,7 +119,39 @@ export function CapacityTable({ initialRows }: CapacityTableProps) {
 
           {/* Sub-headers: h / FTE */}
           <tr className="bg-[#2e2e30] text-gray-300 text-[10px] uppercase tracking-wider">
-            <th className="px-3 py-1.5 text-left min-w-[200px] border-r-2 border-gray-600">Project / Deal</th>
+            <th className="px-3 py-1 border-r-2 border-gray-600">
+              {searchOpen ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    ref={searchRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Escape" && closeSearch()}
+                    placeholder="Search…"
+                    className="flex-1 bg-[#3a3a3c] text-white text-[10px] px-2 py-0.5 rounded border border-gray-500 focus:border-[#FF7700] outline-none placeholder-gray-500 min-w-0"
+                  />
+                  <button
+                    onClick={closeSearch}
+                    className="text-gray-400 hover:text-white flex-shrink-0 leading-none"
+                    aria-label="Close search"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] uppercase tracking-wider">Project / Deal</span>
+                  <button
+                    onClick={() => setSearchOpen(true)}
+                    className="text-gray-500 hover:text-white flex-shrink-0 transition-colors"
+                    aria-label="Search projects"
+                  >
+                    <SearchIcon />
+                  </button>
+                </div>
+              )}
+            </th>
             <th className="px-2 py-1.5 text-center">Src</th>
             <th className="px-2 py-1.5 text-left">Start</th>
             <th className="px-2 py-1.5 text-left">Finish</th>
