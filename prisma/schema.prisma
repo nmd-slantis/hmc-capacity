@@ -20,10 +20,20 @@ model ManualData {
   monthlyData String    @default("{}") // JSON: { "aug-25": 80, ... } hours only
   soldHrs     Float?
   soSeeded    Boolean   @default(false)
-  comments    String?
-  approved    Boolean   @default(false)
-  docusignUrl String?
-  updatedAt   DateTime  @updatedAt
+  comments             String?
+  approved             Boolean   @default(false)
+  docusignUrl          String?
+  office               String?
+  serviceOrderNo       String?
+  serviceOrderFileUrl  String?
+  serviceOrderFileName String?
+  updatedAt            DateTime  @updatedAt
+}
+
+model OfficeOption {
+  id        Int      @id @default(autoincrement())
+  label     String   @unique
+  createdAt DateTime @default(now())
 }
 
 // ─── Auth / User management (NextAuth v5 + PrismaAdapter) ───────────────────

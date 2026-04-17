@@ -29,37 +29,33 @@ const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
   "No Dates":         { header: "bg-gray-500 text-white",    bullet: "bg-gray-300"    },
 };
 
-function TableColgroup({ showMonths = true }: { showMonths?: boolean }) {
+// Base column widths shared between Planning and Admin views
+const BASE_COL_WIDTHS = [300, 36, 36, 36, 95, 95, 58, 75, 150, 80]; // px, sum = 961
+const ADMIN_EXTRA_WIDTHS = [140, 80, 120]; // Office, SO#, Confirmation — sum = 340
+const BASE_TOTAL = BASE_COL_WIDTHS.reduce((a, b) => a + b, 0); // 961
+const ADMIN_TOTAL = BASE_TOTAL + ADMIN_EXTRA_WIDTHS.reduce((a, b) => a + b, 0); // 1301
+const PLANNING_TOTAL = "1976px";
+
+function TableColgroup({ showMonths }: { showMonths: boolean }) {
   return (
     <colgroup>
-      <col style={{ width: "300px" }} />
-      <col style={{ width: "36px" }} />{/* HS */}
-      <col style={{ width: "36px" }} />{/* ODOO */}
-      <col style={{ width: "36px" }} />{/* DocuSign */}
-      <col style={{ width: "95px" }} />
-      <col style={{ width: "95px" }} />
-      <col style={{ width: "58px" }} />{/* Effort Hrs */}
-      <col style={{ width: "75px" }} />{/* SO */}
-      <col style={{ width: "150px" }} />{/* Comments */}
-      <col style={{ width: "80px" }} />{/* Approved */}
-      {showMonths && VISIBLE_MONTHS.map((m) => (
-        <React.Fragment key={m.key}>
-          <col style={{ width: "56px" }} />
-          <col style={{ width: "40px" }} />
-        </React.Fragment>
-      ))}
+      {BASE_COL_WIDTHS.map((w, i) => <col key={i} style={{ width: `${w}px` }} />)}
+      {showMonths
+        ? VISIBLE_MONTHS.map((m) => (
+            <React.Fragment key={m.key}>
+              <col style={{ width: "56px" }} />
+              <col style={{ width: "40px" }} />
+            </React.Fragment>
+          ))
+        : ADMIN_EXTRA_WIDTHS.map((w, i) => <col key={i} style={{ width: `${w}px` }} />)
+      }
     </colgroup>
   );
 }
 
-const TABLE_STYLE: React.CSSProperties = {
-  tableLayout: "fixed",
-  width: "100%",
-  borderCollapse: "collapse",
-};
-
-const TABLE_MIN_WIDTH_MONTHS = "1976px";
-const TABLE_MIN_WIDTH_NO_MONTHS = "961px";
+// Planning table uses full-width layout; Admin uses auto width so base columns stay pixel-identical
+const PLANNING_TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: "100%", borderCollapse: "collapse" };
+const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
 
 export function PlanningTable({ initialRows, showMonths = true }: PlanningTableProps) {
   const [searchOpen, setSearchOpen]   = useState(false);
@@ -68,8 +64,13 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
   const [activeOnly, setActiveOnly] = useState(true);
   const [sortKey, setSortKey]   = useState<string | null>(null);
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const TABLE_MIN_WIDTH = showMonths ? TABLE_MIN_WIDTH_MONTHS : TABLE_MIN_WIDTH_NO_MONTHS;
+  const TABLE_STYLE   = showMonths ? PLANNING_TABLE_STYLE : ADMIN_TABLE_STYLE;
+  const TABLE_MIN_WIDTH = showMonths ? PLANNING_TOTAL : `${ADMIN_TOTAL}px`;
+
+  const toggleGroup = (label: string) =>
+    setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -90,8 +91,7 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
           if (!row.soldHrs || !row.startDate || !row.endDate) return 0;
           return distributeHours(row.soldHrs, row.startDate, row.endDate, VISIBLE_MONTHS)[sortKey] ?? 0;
         };
-        const av = getHrs(a);
-        const bv = getHrs(b);
+        const av = getHrs(a), bv = getHrs(b);
         const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       }
@@ -108,16 +108,10 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
     </span>
   );
 
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const toggleGroup = (label: string) =>
-    setCollapsed((prev) => ({ ...prev, [label]: !(prev[label] ?? true) }));
-
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef   = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (searchOpen) searchRef.current?.focus();
-  }, [searchOpen]);
+  useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
 
   useEffect(() => {
     const body   = bodyScrollRef.current;
@@ -176,29 +170,28 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
               {/* Row 1 — filter toggle + month labels */}
               <tr className="bg-[#202022] text-white">
                 <th colSpan={1} className="px-3 py-2 border-r-2 border-gray-600" />
-                <th colSpan={9} className={`px-3 ${showMonths ? "" : "pr-3"} border-r-2 border-gray-600`}>
+                <th colSpan={9} className="px-3 border-r-2 border-gray-600">
                   <button
                     onClick={() => setActiveOnly((v) => !v)}
                     className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded transition-colors ${
-                      activeOnly
-                        ? "bg-[#FF7700] text-white"
-                        : "bg-gray-700 text-gray-400 hover:text-white"
+                      activeOnly ? "bg-[#FF7700] text-white" : "bg-gray-700 text-gray-400 hover:text-white"
                     }`}
                   >
                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOnly ? "bg-white" : "bg-gray-500"}`} />
                     Active only
                   </button>
                 </th>
+                {!showMonths && (
+                  <th colSpan={3} className="px-3 py-2 text-[11px] text-gray-500 text-left" />
+                )}
                 {showMonths && VISIBLE_MONTHS.map((m, i) => (
                   <th
                     key={m.key}
                     colSpan={2}
                     className={`px-2 py-2 text-[11px] whitespace-nowrap ${
-                      i === 0
-                        ? "border-l-2 border-gray-600"
-                        : m.quarterStart
-                        ? "border-l-2 border-gray-600"
-                        : "border-l border-gray-700"
+                      i === 0 ? "border-l-2 border-gray-600"
+                      : m.quarterStart ? "border-l-2 border-gray-600"
+                      : "border-l border-gray-700"
                     }`}
                     style={{ fontFamily: "Space Grotesk, sans-serif" }}
                   >
@@ -224,24 +217,15 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                         placeholder="Search…"
                         className="flex-1 bg-[#3a3a3c] text-white text-[10px] px-2 py-0.5 rounded border border-gray-500 focus:border-[#FF7700] outline-none placeholder-gray-500 min-w-0"
                       />
-                      <button
-                        onClick={closeSearch}
-                        className="text-gray-400 hover:text-white flex-shrink-0 leading-none"
-                        aria-label="Close search"
-                      >✕</button>
+                      <button onClick={closeSearch} className="text-gray-400 hover:text-white flex-shrink-0 leading-none" aria-label="Close search">✕</button>
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-1">
                       <button onClick={() => handleSort("name")}
                         className={`text-[10px] uppercase tracking-wider hover:text-white transition-colors inline-flex items-center gap-1 ${sortKey === "name" ? "text-[#FF7700]" : ""}`}>
-                        Project / Deal
-                        {sortIndicator("name")}
+                        Project / Deal {sortIndicator("name")}
                       </button>
-                      <button
-                        onClick={() => setSearchOpen(true)}
-                        className="text-gray-500 hover:text-white flex-shrink-0 transition-colors"
-                        aria-label="Search projects"
-                      >
+                      <button onClick={() => setSearchOpen(true)} className="text-gray-500 hover:text-white flex-shrink-0 transition-colors" aria-label="Search projects">
                         <SearchIcon />
                       </button>
                     </div>
@@ -270,38 +254,41 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                     <circle cx="20.5" cy="8" r="2" fill="white" />
                   </svg>
                 </th>
-                {(["startDate","endDate","soldHrs","so"] as const).flatMap((key) => {
+                {(["startDate","endDate","soldHrs","so"] as const).map((key) => {
                   const labels: Record<string, string> = { startDate: "Start", endDate: "End", soldHrs: "Effort Hrs", so: "SO" };
                   const aligns: Record<string, string> = { startDate: "text-left", endDate: "text-left", soldHrs: "text-right", so: "text-center" };
                   const active = sortKey === key;
-                  return [(
+                  return (
                     <th key={key} className={`px-2 py-1.5 ${aligns[key]} cursor-pointer select-none hover:text-white transition-colors ${active ? "text-[#FF7700]" : ""}`}
                       onClick={() => handleSort(key)}>
-                      <span className="inline-flex items-center gap-1">
-                        {labels[key]}
-                        {sortIndicator(key)}
-                      </span>
+                      <span className="inline-flex items-center gap-1">{labels[key]} {sortIndicator(key)}</span>
                     </th>
-                  )];
+                  );
                 })}
                 <th className="px-2 py-1.5 text-left">Comments</th>
-                <th className={`px-2 py-1.5 text-center ${showMonths ? "border-r-2 border-gray-600" : ""}`}>Approved?</th>
+                <th className="px-2 py-1.5 text-center">Approved?</th>
+
+                {/* Admin-only sub-headers */}
+                {!showMonths && (
+                  <>
+                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Office</th>
+                    <th className="px-2 py-1.5 text-right border-l border-gray-700">SO #</th>
+                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Service Order Confirmation</th>
+                  </>
+                )}
+
+                {/* Planning-only month sub-headers */}
                 {showMonths && VISIBLE_MONTHS.map((m, i) => (
                   <React.Fragment key={m.key}>
                     <th
-                      className={`px-1 py-1.5 text-right cursor-pointer select-none hover:text-white transition-colors ${
-                        i === 0
-                          ? "border-l-2 border-gray-600"
-                          : m.quarterStart
-                          ? "border-l-2 border-gray-600"
-                          : "border-l border-gray-700"
+                      className={`px-1 py-1.5 text-right cursor-pointer select-none hover:text-white transition-colors border-r-2 border-gray-600 ${
+                        i === 0 ? "border-l-2 border-gray-600"
+                        : m.quarterStart ? "border-l-2 border-gray-600"
+                        : "border-l border-gray-700"
                       } ${sortKey === m.key ? "text-[#FF7700]" : ""}`}
                       onClick={() => handleSort(m.key)}
                     >
-                      <span className="inline-flex items-center justify-end gap-0.5">
-                        Hrs
-                        {sortIndicator(m.key)}
-                      </span>
+                      <span className="inline-flex items-center justify-end gap-0.5">Hrs {sortIndicator(m.key)}</span>
                     </th>
                     <th className="px-1 py-1.5 text-right bg-gray-800/40">FTE</th>
                   </React.Fragment>
@@ -315,12 +302,7 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
       {/* ── GROUP CARDS ─────────────────────────────────────────────────── */}
       <div
         ref={bodyScrollRef}
-        style={{
-          overflowX: "auto",
-          overflowY: "auto",
-          maxHeight: "calc(100vh - 220px)",
-          scrollbarGutter: "stable",
-        }}
+        style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", scrollbarGutter: "stable" }}
       >
         <div style={{ minWidth: TABLE_MIN_WIDTH, display: "flex", flexDirection: "column", gap: "8px", paddingBottom: "8px" }}>
 
@@ -344,10 +326,7 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                 <table className="text-xs" style={TABLE_STYLE}>
                   <TableColgroup showMonths={showMonths} />
                   <thead>
-                    <tr
-                      className={`cursor-pointer select-none ${style.header}`}
-                      onClick={() => toggleGroup(label)}
-                    >
+                    <tr className={`cursor-pointer select-none ${style.header}`} onClick={() => toggleGroup(label)}>
                       <td colSpan={10} className="px-4 py-2.5" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
                         <div className="flex items-center gap-2.5">
                           <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.bullet}`} />
@@ -356,6 +335,13 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                           <span className="ml-auto text-[11px] opacity-60">{isCollapsed ? "▼" : "▲"}</span>
                         </div>
                       </td>
+                      {/* Admin placeholder cells */}
+                      {!showMonths && (
+                        <>
+                          <td /><td /><td />
+                        </>
+                      )}
+                      {/* Planning month totals */}
                       {showMonths && VISIBLE_MONTHS.map((month, i) => {
                         const hrs = monthTotals[month.key] ?? 0;
                         const fte = hrs > 0 ? hoursToFte(hrs, month.workdayHours) : null;
@@ -374,13 +360,12 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                       })}
                     </tr>
                   </thead>
-                  {!isCollapsed && (
-                    <tbody>
-                      {rows.map((row) => (
-                        <ProjectRow key={row.id} initialRow={row} showMonths={showMonths} />
-                      ))}
-                    </tbody>
-                  )}
+                  {/* Always rendered — CSS hidden to preserve local edit state when collapsed */}
+                  <tbody className={isCollapsed ? "hidden" : ""}>
+                    {rows.map((row) => (
+                      <ProjectRow key={row.id} initialRow={row} showMonths={showMonths} />
+                    ))}
+                  </tbody>
                 </table>
               </div>
             );

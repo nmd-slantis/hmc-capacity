@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 
 interface EditableCellProps {
   rowId: string;
-  field: string;          // "effort" | "startDate" | "endDate" | month key e.g. "aug-25"
+  field: string;
   value: string | number | null;
   type?: "number" | "date" | "text";
   onSaved?: (newValue: string | number | null) => void;
@@ -37,11 +37,8 @@ export function EditableCell({
     }
   }, [editing]);
 
-  // Keep draft in sync if value changes externally
   useEffect(() => {
-    if (!editing) {
-      setDraft(String(value ?? ""));
-    }
+    if (!editing) setDraft(String(value ?? ""));
   }, [value, editing]);
 
   const save = async () => {
@@ -49,18 +46,24 @@ export function EditableCell({
     setEditing(false);
 
     let body: Record<string, unknown>;
+    let optimisticValue: string | number | null;
 
     if (isMonthKey(field)) {
-      body = {
-        monthKey: field,
-        monthHours: draft === "" ? 0 : parseFloat(draft) || 0,
-      };
+      const hrs = draft === "" ? 0 : parseFloat(draft) || 0;
+      body = { monthKey: field, monthHours: hrs };
+      optimisticValue = hrs;
     } else if (field === "effort") {
-      body = { effort: draft === "" ? null : parseFloat(draft) || null };
+      const v = draft === "" ? null : parseFloat(draft) || null;
+      body = { effort: v };
+      optimisticValue = v;
     } else {
-      // startDate or endDate
-      body = { [field]: draft === "" ? null : draft };
+      const v = draft === "" ? null : draft;
+      body = { [field]: v };
+      optimisticValue = v;
     }
+
+    // Show the new value immediately — no waiting for the API
+    onSaved?.(optimisticValue);
 
     try {
       const res = await fetch(`/api/planning/${rowId}`, {
@@ -71,7 +74,7 @@ export function EditableCell({
 
       if (res.ok) {
         const updated = await res.json();
-        let savedValue: string | number | null = null;
+        let serverValue: string | number | null = null;
 
         if (isMonthKey(field)) {
           const monthly = (() => {
@@ -79,21 +82,23 @@ export function EditableCell({
               return typeof updated.monthlyData === "string"
                 ? JSON.parse(updated.monthlyData)
                 : updated.monthlyData;
-            } catch {
-              return {};
-            }
+            } catch { return {}; }
           })();
-          savedValue = monthly[field] ?? 0;
+          serverValue = monthly[field] ?? 0;
         } else if (field === "effort") {
-          savedValue = updated.effort ?? null;
+          serverValue = updated.effort ?? null;
         } else {
-          savedValue = updated[field] ?? null;
+          serverValue = updated[field] ?? null;
         }
 
-        onSaved?.(savedValue);
+        // Correct if server normalized the value
+        if (serverValue !== optimisticValue) onSaved?.(serverValue);
+      } else {
+        // Revert on failure
+        onSaved?.(value);
       }
-    } catch (e) {
-      console.error("Save failed", e);
+    } catch {
+      onSaved?.(value);
     } finally {
       setSaving(false);
     }
@@ -104,7 +109,6 @@ export function EditableCell({
     setEditing(false);
   };
 
-  // Format ISO date (YYYY-MM-DD) → MM/DD/YYYY for display
   const formatDisplay = (v: string | number | null): string | null => {
     if (v === null || v === undefined || v === "") return null;
     const s = String(v);
@@ -137,18 +141,11 @@ export function EditableCell({
 
   return (
     <div
-      onClick={() => {
-        setDraft(String(value ?? ""));
-        setEditing(true);
-      }}
-      className={`editable-cell px-1 py-0.5 min-h-[1.5rem] text-xs rounded transition-colors ${
-        saving ? "opacity-40" : ""
-      } ${className}`}
+      onClick={() => { setDraft(String(value ?? "")); setEditing(true); }}
+      className={`editable-cell px-1 py-0.5 min-h-[1.5rem] text-xs rounded transition-colors ${saving ? "opacity-40" : ""} ${className}`}
       title="Click to edit"
     >
-      {displayValue ?? (
-        <span className="text-gray-300 select-none">{placeholder}</span>
-      )}
+      {displayValue ?? <span className="text-gray-300 select-none">{placeholder}</span>}
     </div>
   );
 }

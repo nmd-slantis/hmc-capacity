@@ -20,5 +20,9 @@ export interface PlanningRow {
   comments: string | null;
   approved: boolean;
   docusignUrl: string | null;
+  office: string | null;
+  serviceOrderNo: string | null;
+  serviceOrderFileUrl: string | null;
+  serviceOrderFileName: string | null;
   group: string;              // display group label, used for section headers
 }

@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { EditableCell } from "./EditableCell";
+import { OfficeDropdown } from "./OfficeDropdown";
+import { FileUploadCell } from "./FileUploadCell";
 import { VISIBLE_MONTHS, hoursToFte, distributeHours } from "@/config/months";
 import type { PlanningRow } from "@/types/planning";
 
@@ -11,7 +13,6 @@ interface ProjectRowProps {
   showMonths?: boolean;
 }
 
-// Row background + border keyed by group label
 const GROUP_ROW_CLASS: Record<string, string> = {
   "Ongoing":          "bg-blue-100 border-blue-200",
   "Service Pipeline": "bg-orange-100 border-orange-200",
@@ -23,7 +24,6 @@ const GROUP_ROW_CLASS: Record<string, string> = {
   "No Dates":         "bg-white border-gray-100",
 };
 
-/** DocuSign signature mark */
 function DocuSignMark() {
   return (
     <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" aria-hidden="true">
@@ -33,7 +33,6 @@ function DocuSignMark() {
   );
 }
 
-/** Odoo "O" mark — simplified Odoo icon */
 function OdooMark() {
   return (
     <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" aria-hidden="true">
@@ -43,19 +42,14 @@ function OdooMark() {
   );
 }
 
-/** HubSpot sprocket mark — simplified 3-arm connected-circles logo */
 function HubSpotMark() {
   return (
     <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" aria-hidden="true">
-      {/* Center */}
       <circle cx="12" cy="12" r="3" fill="white" />
-      {/* Top arm */}
       <rect x="11" y="5.5" width="2" height="4.5" rx="1" fill="white" />
       <circle cx="12" cy="4.5" r="2.5" fill="white" />
-      {/* Bottom-right arm */}
       <line x1="14.2" y1="13.5" x2="17.5" y2="16" stroke="white" strokeWidth="2" strokeLinecap="round" />
       <circle cx="19" cy="17.2" r="2.5" fill="white" />
-      {/* Bottom-left arm */}
       <line x1="9.8" y1="13.5" x2="6.5" y2="16" stroke="white" strokeWidth="2" strokeLinecap="round" />
       <circle cx="5" cy="17.2" r="2.5" fill="white" />
     </svg>
@@ -97,7 +91,7 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#FF7A59] hover:opacity-80 transition-opacity"
-            title={row.hsUrl ? "Open in HubSpot" : "HubSpot deal"}
+            title={row.hsUrl ? "Open Deal in HubSpot" : "HubSpot deal"}
             onClick={(e) => !row.hsUrl && e.preventDefault()}
           >
             <HubSpotMark />
@@ -105,7 +99,7 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
         )}
       </td>
 
-      {/* Odoo SO link — purple+linked / gray+full when SO but no project / dimmed when no SO */}
+      {/* Odoo SO link */}
       <td className="px-2 py-2 text-center">
         <a
           href={row.odooSoUrl ?? undefined}
@@ -125,22 +119,22 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
         </a>
       </td>
 
-      {/* DocuSign link — opens modal to set URL */}
+      {/* DocuSign */}
       <td className="px-2 py-2 text-center">
         <DocuSignCell rowId={row.id} url={row.docusignUrl} onSaved={(v) => updateField("docusignUrl", v)} />
       </td>
 
-      {/* Start date — read-only */}
+      {/* Start date */}
       <td className="px-2 py-1 whitespace-nowrap text-gray-700">
         {fmtDate(row.startDate)}
       </td>
 
-      {/* End date — read-only */}
+      {/* End date */}
       <td className="px-2 py-1 whitespace-nowrap text-gray-700">
         {fmtDate(row.endDate)}
       </td>
 
-      {/* Effort Hrs — read-only */}
+      {/* Effort Hrs */}
       <td className="px-2 py-1 text-right text-gray-800">
         {row.soldHrs != null && row.soldHrs > 0 ? row.soldHrs : ""}
       </td>
@@ -159,7 +153,7 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
       </td>
 
       {/* Approved */}
-      <td className="px-2 py-1 text-center border-r-2 border-gray-200">
+      <td className="px-2 py-1 text-center">
         <ApprovedCheckbox
           rowId={row.id}
           checked={row.approved}
@@ -167,7 +161,42 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
         />
       </td>
 
-      {/* Monthly columns — projected from sold hrs / weekday distribution */}
+      {/* Admin-only columns */}
+      {!showMonths && (
+        <>
+          <td className="px-2 py-1">
+            <OfficeDropdown
+              rowId={row.id}
+              value={row.office}
+              onSaved={(v) => updateField("office", v)}
+            />
+          </td>
+          <td className="px-2 py-1">
+            <EditableCell
+              rowId={row.id}
+              field="serviceOrderNo"
+              value={row.serviceOrderNo}
+              type="number"
+              onSaved={(v) => updateField("serviceOrderNo", v != null ? String(v) : null)}
+              className="text-gray-700 text-xs text-right"
+              placeholder="—"
+            />
+          </td>
+          <td className="px-2 py-1">
+            <FileUploadCell
+              rowId={row.id}
+              fileUrl={row.serviceOrderFileUrl}
+              fileName={row.serviceOrderFileName}
+              onSaved={(url, name) => {
+                updateField("serviceOrderFileUrl", url);
+                updateField("serviceOrderFileName", name);
+              }}
+            />
+          </td>
+        </>
+      )}
+
+      {/* Monthly columns */}
       {showMonths && VISIBLE_MONTHS.map((month, i) => {
         const hours = projectedMonthly[month.key] ?? 0;
         const fte = hours > 0 ? hoursToFte(hours, month.workdayHours) : null;
@@ -189,7 +218,6 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
           </React.Fragment>
         );
       })}
-
     </tr>
   );
 }
@@ -280,28 +308,26 @@ function ApprovedCheckbox({ rowId, checked, onChange }: {
   checked: boolean;
   onChange: (v: boolean) => void;
 }) {
-  const [saving, setSaving] = useState(false);
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.checked;
-    setSaving(true);
+  const toggle = async (val: boolean) => {
+    onChange(val); // optimistic — update immediately
     try {
       const res = await fetch(`/api/planning/${rowId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ approved: val }),
       });
-      if (res.ok) onChange(val);
-    } finally {
-      setSaving(false);
+      if (!res.ok) onChange(!val); // revert on failure
+    } catch {
+      onChange(!val);
     }
   };
+
   return (
     <input
       type="checkbox"
       checked={checked}
-      onChange={handleChange}
-      disabled={saving}
-      className="w-4 h-4 accent-[#FF7700] cursor-pointer disabled:opacity-40"
+      onChange={(e) => toggle(e.target.checked)}
+      className="w-4 h-4 accent-[#FF7700] cursor-pointer"
     />
   );
 }

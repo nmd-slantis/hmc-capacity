@@ -107,6 +107,26 @@ export async function PATCH(
     data.approved = existing?.approved ?? false;
   }
 
+  if (body.office !== undefined) {
+    data.office = body.office || null;
+  } else if (existing?.office !== undefined) {
+    data.office = existing.office;
+  }
+
+  if (body.serviceOrderNo !== undefined) {
+    data.serviceOrderNo = body.serviceOrderNo || null;
+  } else if (existing?.serviceOrderNo !== undefined) {
+    data.serviceOrderNo = existing.serviceOrderNo;
+  }
+
+  if (body.serviceOrderFileUrl !== undefined) {
+    data.serviceOrderFileUrl = body.serviceOrderFileUrl || null;
+    data.serviceOrderFileName = body.serviceOrderFileName || null;
+  } else {
+    data.serviceOrderFileUrl = existing?.serviceOrderFileUrl ?? null;
+    data.serviceOrderFileName = existing?.serviceOrderFileName ?? null;
+  }
+
   const record = await prisma.manualData.upsert({
     where: { id },
     create: data,

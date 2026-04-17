@@ -211,6 +211,10 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       comments: manual?.comments ?? null,
       docusignUrl: manual?.docusignUrl ?? null,
       approved: manual?.approved ?? false,
+      office: manual?.office ?? null,
+      serviceOrderNo: manual?.serviceOrderNo ?? null,
+      serviceOrderFileUrl: manual?.serviceOrderFileUrl ?? null,
+      serviceOrderFileName: manual?.serviceOrderFileName ?? null,
       group: hsGroup(hsPipeline, hsStage),
     });
   }
