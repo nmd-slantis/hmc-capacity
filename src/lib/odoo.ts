@@ -80,10 +80,7 @@ export async function fetchOdooProjects(): Promise<OdooProject[]> {
 
 export function extractSoNumber(project: OdooProject): string | null {
   if (project.sale_order_id && Array.isArray(project.sale_order_id)) {
-    return String(project.sale_order_id[0]);
-  }
-  if (project.analytic_account_id && Array.isArray(project.analytic_account_id)) {
-    return project.analytic_account_id[1] ?? null;
+    return project.sale_order_id[1] ?? null;
   }
   return null;
 }
