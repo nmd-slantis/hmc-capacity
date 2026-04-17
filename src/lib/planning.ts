@@ -125,7 +125,7 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
 
       // Canonical dates: SO+projects → project dates; SO only → SO date_order / null; no SO → HS createdate / null
       const canonicalStart: Date | null = soData
-        ? (projDates.startDate ?? (soData.date_order && soData.date_order !== false
+        ? (projDates.startDate ?? (soData.date_order
             ? new Date(String(soData.date_order).substring(0, 10))
             : null))
         : parseHsDate(d.properties.createdate);
@@ -181,7 +181,7 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     const startDate: string | null = soData
       ? (projDates.startDate
           ? dateToIso(projDates.startDate)
-          : (soData.date_order && soData.date_order !== false ? String(soData.date_order).substring(0, 10) : null))
+          : (soData.date_order ? String(soData.date_order).substring(0, 10) : null))
       : dateToIso(parseHsDate(d.properties.createdate));
     const endDate: string | null = soData ? dateToIso(projDates.endDate) : null;
     const hsPipeline = d.properties.pipeline ?? null;
