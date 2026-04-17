@@ -91,7 +91,7 @@ export function distributeHours(
   for (const month of months) {
     const wd = weekdaysPerMonth[month.key] ?? 0;
     if (wd > 0) {
-      result[month.key] = Math.round((soldHrs * wd / totalWeekdays) * 10) / 10;
+      result[month.key] = Math.round(soldHrs * wd / totalWeekdays);
     }
   }
   return result;
