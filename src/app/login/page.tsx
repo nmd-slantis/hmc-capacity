@@ -31,7 +31,7 @@ export default function LoginPage() {
           className="text-xl font-semibold text-[#202022] mb-1"
           style={{ fontFamily: "Space Grotesk, sans-serif" }}
         >
-          HMC Capacity
+          HMC Planning
         </h1>
         <p className="text-sm text-gray-500 mb-8">
           Co-creating the extraordinary 🚀
