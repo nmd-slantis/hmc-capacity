@@ -1,3 +1,5 @@
+import * as xmlrpc from 'xmlrpc';
+
 export interface OdooProject {
   id: number;
   name: string;
@@ -5,90 +7,8 @@ export interface OdooProject {
   date: string | false;
   partner_id: [number, string] | false;
   last_update_status: string;
-  // Sale order number — field name varies by Odoo setup; we try common ones
   sale_order_id?: [number, string] | false;
   analytic_account_id?: [number, string] | false;
-}
-
-async function authenticate(): Promise<{ uid: number; cookie: string }> {
-  const res = await fetch(`${process.env.ODOO_URL}/web/session/authenticate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0", method: "call", id: 1,
-      params: {
-        db: process.env.ODOO_DB,
-        login: process.env.ODOO_USERNAME,
-        password: process.env.ODOO_API_KEY,
-      },
-    }),
-    cache: "no-store",
-  });
-  const setCookie = res.headers.get("set-cookie") ?? "";
-  const cookie = setCookie.split(";")[0].trim();
-  const json = await res.json();
-  if (!json.result?.uid) {
-    throw new Error(`Odoo authentication failed — status ${res.status}, error: ${JSON.stringify(json.error ?? json.result ?? null)}`);
-  }
-  return { uid: json.result.uid as number, cookie };
-}
-
-function odooHeaders(cookie: string): Record<string, string> {
-  return {
-    "Content-Type": "application/json",
-    ...(cookie ? { Cookie: cookie } : {}),
-  };
-}
-
-export async function fetchOdooProjects(): Promise<OdooProject[]> {
-  const { cookie } = await authenticate();
-  const res = await fetch(
-    `${process.env.ODOO_URL}/web/dataset/call_kw`,
-    {
-      method: "POST",
-      headers: odooHeaders(cookie),
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        method: "call",
-        id: 2,
-        params: {
-          model: "project.project",
-          method: "search_read",
-          args: [[["partner_id.name", "=", "HMC Architects"]]],
-          kwargs: {
-            fields: [
-              "id",
-              "name",
-              "date_start",
-              "date",
-              "partner_id",
-              "last_update_status",
-              "sale_order_id",
-              "analytic_account_id",
-            ],
-            context: { lang: "en_US", tz: "UTC" },
-          },
-        },
-      }),
-      next: { revalidate: 300 },
-    }
-  );
-
-  const json = await res.json();
-  if (json.error) {
-    throw new Error(`Odoo RPC error: ${JSON.stringify(json.error)}`);
-  }
-  return (json.result ?? []) as OdooProject[];
-}
-
-export function extractSoNumber(project: OdooProject): string | null {
-  if (project.sale_order_id && Array.isArray(project.sale_order_id)) {
-    return String(project.sale_order_id[0]);
-  }
-  if (project.analytic_account_id && Array.isArray(project.analytic_account_id)) {
-    return project.analytic_account_id[1] ?? null;
-  }
-  return null;
 }
 
 export interface OdooSoData {
@@ -106,87 +26,100 @@ export interface OdooProjectDates {
   date: string | false | null;
 }
 
-/** Search sale.orders by SO name (e.g. "S00042") and return a map keyed by name */
+function rpc(path: string, method: string, params: unknown[]): Promise<unknown> {
+  const url = new URL(process.env.ODOO_URL!);
+  const port = url.port ? parseInt(url.port) : (url.protocol === 'https:' ? 443 : 80);
+  const clientFn = url.protocol === 'https:' ? xmlrpc.createSecureClient : xmlrpc.createClient;
+  const client = clientFn({ host: url.hostname, port, path });
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (client as any).methodCall(method, params, (err: Error | null, val: unknown) => {
+      if (err) reject(new Error(String(err)));
+      else resolve(val);
+    });
+  });
+}
+
+async function authenticate(): Promise<number> {
+  const uid = await rpc('/xmlrpc/2/common', 'authenticate', [
+    process.env.ODOO_DB,
+    process.env.ODOO_USERNAME,
+    process.env.ODOO_API_KEY,
+    {},
+  ]);
+  if (typeof uid !== 'number' || !uid) throw new Error(`Odoo auth failed: uid=${String(uid)}`);
+  return uid;
+}
+
+async function executeKw(
+  uid: number,
+  model: string,
+  method: string,
+  args: unknown[],
+  kwargs: Record<string, unknown>,
+): Promise<unknown> {
+  return rpc('/xmlrpc/2/object', 'execute_kw', [
+    process.env.ODOO_DB,
+    uid,
+    process.env.ODOO_API_KEY,
+    model,
+    method,
+    args,
+    kwargs,
+  ]);
+}
+
+export async function fetchOdooProjects(): Promise<OdooProject[]> {
+  const uid = await authenticate();
+  const result = await executeKw(uid, 'project.project', 'search_read',
+    [[['partner_id.name', '=', 'HMC Architects']]],
+    { fields: ['id', 'name', 'date_start', 'date', 'partner_id', 'last_update_status', 'sale_order_id', 'analytic_account_id'], context: { lang: 'en_US', tz: 'UTC' } },
+  );
+  return (result as OdooProject[]) ?? [];
+}
+
+export function extractSoNumber(project: OdooProject): string | null {
+  if (project.sale_order_id && Array.isArray(project.sale_order_id)) {
+    return String(project.sale_order_id[0]);
+  }
+  if (project.analytic_account_id && Array.isArray(project.analytic_account_id)) {
+    return project.analytic_account_id[1] ?? null;
+  }
+  return null;
+}
+
 export async function fetchOdooSosByNames(names: string[]): Promise<Map<string, OdooSoData>> {
   if (!names.length) return new Map();
-  const { cookie } = await authenticate();
-  const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
-    method: "POST",
-    headers: odooHeaders(cookie),
-    body: JSON.stringify({
-      jsonrpc: "2.0", method: "call", id: 4,
-      params: {
-        model: "sale.order",
-        method: "search_read",
-        args: [[["name", "in", names]]],
-        kwargs: {
-          fields: ["id", "name", "project_ids", "x_studio_sold_hours", "x_studio_project_start_date", "x_studio_project_end_date"],
-          context: { lang: "en_US", tz: "UTC" },
-        },
-      },
-    }),
-    next: { revalidate: 300 },
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(`Odoo SO by name RPC error: ${JSON.stringify(json.error)}`);
+  const uid = await authenticate();
+  const result = await executeKw(uid, 'sale.order', 'search_read',
+    [[['name', 'in', names]]],
+    { fields: ['id', 'name', 'project_ids', 'x_studio_sold_hours', 'x_studio_project_start_date', 'x_studio_project_end_date'], context: { lang: 'en_US', tz: 'UTC' } },
+  );
   const map = new Map<string, OdooSoData>();
-  for (const so of (json.result ?? []) as (OdooSoData & { name: string })[]) {
-    map.set(so.name, so);
-  }
+  for (const so of (result as (OdooSoData & { name: string })[]) ?? []) map.set(so.name, so);
   return map;
 }
 
 export async function fetchOdooSoDetails(soIds: number[]): Promise<Map<number, OdooSoData>> {
   if (!soIds.length) return new Map();
-  const { cookie } = await authenticate();
-  const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
-    method: "POST",
-    headers: odooHeaders(cookie),
-    body: JSON.stringify({
-      jsonrpc: "2.0", method: "call", id: 3,
-      params: {
-        model: "sale.order",
-        method: "search_read",
-        args: [[["id", "in", soIds]]],
-        kwargs: {
-          fields: ["id", "x_studio_sold_hours", "x_studio_project_start_date", "x_studio_project_end_date"],
-          context: { lang: "en_US", tz: "UTC" },
-        },
-      },
-    }),
-    next: { revalidate: 300 },
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(`Odoo SO RPC error: ${JSON.stringify(json.error)}`);
+  const uid = await authenticate();
+  const result = await executeKw(uid, 'sale.order', 'search_read',
+    [[['id', 'in', soIds]]],
+    { fields: ['id', 'x_studio_sold_hours', 'x_studio_project_start_date', 'x_studio_project_end_date'], context: { lang: 'en_US', tz: 'UTC' } },
+  );
   const map = new Map<number, OdooSoData>();
-  for (const so of (json.result ?? []) as OdooSoData[]) map.set(so.id, so);
+  for (const so of (result as OdooSoData[]) ?? []) map.set(so.id, so);
   return map;
 }
 
-/** Fetch date_start + date for a list of project IDs */
 export async function fetchOdooProjectDates(projectIds: number[]): Promise<Map<number, OdooProjectDates>> {
   if (!projectIds.length) return new Map();
-  const { cookie } = await authenticate();
-  const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
-    method: "POST",
-    headers: odooHeaders(cookie),
-    body: JSON.stringify({
-      jsonrpc: "2.0", method: "call", id: 5,
-      params: {
-        model: "project.project",
-        method: "search_read",
-        args: [[["id", "in", projectIds]]],
-        kwargs: {
-          fields: ["id", "date_start", "date"],
-          context: { lang: "en_US", tz: "UTC" },
-        },
-      },
-    }),
-    next: { revalidate: 300 },
-  });
-  const json = await res.json();
-  if (json.error) throw new Error(`Odoo project dates RPC error: ${JSON.stringify(json.error)}`);
+  const uid = await authenticate();
+  const result = await executeKw(uid, 'project.project', 'search_read',
+    [[['id', 'in', projectIds]]],
+    { fields: ['id', 'date_start', 'date'], context: { lang: 'en_US', tz: 'UTC' } },
+  );
   const map = new Map<number, OdooProjectDates>();
-  for (const p of (json.result ?? []) as OdooProjectDates[]) map.set(p.id, p);
+  for (const p of (result as OdooProjectDates[]) ?? []) map.set(p.id, p);
   return map;
 }
