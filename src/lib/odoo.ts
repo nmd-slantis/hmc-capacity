@@ -10,19 +10,43 @@ export interface OdooProject {
   analytic_account_id?: [number, string] | false;
 }
 
-function odooHeaders(): Record<string, string> {
+async function authenticate(): Promise<{ uid: number; cookie: string }> {
+  const res = await fetch(`${process.env.ODOO_URL}/web/session/authenticate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0", method: "call", id: 1,
+      params: {
+        db: process.env.ODOO_DB,
+        login: process.env.ODOO_USERNAME,
+        password: process.env.ODOO_API_KEY,
+      },
+    }),
+    cache: "no-store",
+  });
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  const cookie = setCookie.split(";")[0].trim();
+  const json = await res.json();
+  if (!json.result?.uid) {
+    throw new Error(`Odoo authentication failed — status ${res.status}, error: ${JSON.stringify(json.error ?? json.result ?? null)}`);
+  }
+  return { uid: json.result.uid as number, cookie };
+}
+
+function odooHeaders(cookie: string): Record<string, string> {
   return {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${process.env.ODOO_API_KEY}`,
+    ...(cookie ? { Cookie: cookie } : {}),
   };
 }
 
 export async function fetchOdooProjects(): Promise<OdooProject[]> {
+  const { cookie } = await authenticate();
   const res = await fetch(
     `${process.env.ODOO_URL}/web/dataset/call_kw`,
     {
       method: "POST",
-      headers: odooHeaders(),
+      headers: odooHeaders(cookie),
       body: JSON.stringify({
         jsonrpc: "2.0",
         method: "call",
@@ -85,9 +109,10 @@ export interface OdooProjectDates {
 /** Search sale.orders by SO name (e.g. "S00042") and return a map keyed by name */
 export async function fetchOdooSosByNames(names: string[]): Promise<Map<string, OdooSoData>> {
   if (!names.length) return new Map();
+  const { cookie } = await authenticate();
   const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
     method: "POST",
-    headers: odooHeaders(),
+    headers: odooHeaders(cookie),
     body: JSON.stringify({
       jsonrpc: "2.0", method: "call", id: 4,
       params: {
@@ -113,9 +138,10 @@ export async function fetchOdooSosByNames(names: string[]): Promise<Map<string, 
 
 export async function fetchOdooSoDetails(soIds: number[]): Promise<Map<number, OdooSoData>> {
   if (!soIds.length) return new Map();
+  const { cookie } = await authenticate();
   const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
     method: "POST",
-    headers: odooHeaders(),
+    headers: odooHeaders(cookie),
     body: JSON.stringify({
       jsonrpc: "2.0", method: "call", id: 3,
       params: {
@@ -140,9 +166,10 @@ export async function fetchOdooSoDetails(soIds: number[]): Promise<Map<number, O
 /** Fetch date_start + date for a list of project IDs */
 export async function fetchOdooProjectDates(projectIds: number[]): Promise<Map<number, OdooProjectDates>> {
   if (!projectIds.length) return new Map();
+  const { cookie } = await authenticate();
   const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
     method: "POST",
-    headers: odooHeaders(),
+    headers: odooHeaders(cookie),
     body: JSON.stringify({
       jsonrpc: "2.0", method: "call", id: 5,
       params: {
