@@ -37,7 +37,6 @@ function TableColgroup() {
       <col style={{ width: "50px" }} />{/* ODOO */}
       <col style={{ width: "95px" }} />
       <col style={{ width: "95px" }} />
-      <col style={{ width: "65px" }} />{/* Sold Hrs */}
       <col style={{ width: "75px" }} />{/* Effort Hrs */}
       <col style={{ width: "75px" }} />{/* SO */}
       <col style={{ width: "150px" }} />{/* Comments */}
@@ -132,7 +131,7 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
               {/* Row 1 — month labels */}
               <tr className="bg-[#202022] text-white">
                 <th colSpan={1} className="px-3 py-2 border-r-2 border-gray-600" />
-                <th colSpan={9} className="border-r-2 border-gray-600" />
+                <th colSpan={8} className="border-r-2 border-gray-600" />
                 {VISIBLE_MONTHS.map((m, i) => (
                   <th
                     key={m.key}
@@ -207,8 +206,7 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                   </svg>
                 </th>
                 <th className="px-2 py-1.5 text-left">Start</th>
-                <th className="px-2 py-1.5 text-left">Finish</th>
-                <th className="px-2 py-1.5 text-right">Sold Hrs</th>
+                <th className="px-2 py-1.5 text-left">End</th>
                 <th className="px-2 py-1.5 text-right">Effort Hrs</th>
                 <th className="px-2 py-1.5 text-center">SO</th>
                 <th className="px-2 py-1.5 text-left">Comments</th>

@@ -123,18 +123,26 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       const soData = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
       const projDates = soData ? getSoProjectDates(soData) : { startDate: null, endDate: null };
 
-      const needsDateSeed = (!isValidDate(existing?.startDate) || !isValidDate(existing?.endDate)) &&
-        !!(projDates.startDate || projDates.endDate || d.properties.project_start_date || d.properties.project_end_date);
+      // Canonical dates: SO+projects → project dates; SO only → SO date_order / null; no SO → HS createdate / null
+      const canonicalStart: Date | null = soData
+        ? (projDates.startDate ?? (soData.date_order && soData.date_order !== false
+            ? new Date(String(soData.date_order).substring(0, 10))
+            : null))
+        : parseHsDate(d.properties.createdate);
+      const canonicalEnd: Date | null = soData ? (projDates.endDate ?? null) : null;
+
+      const storedStartStr   = isValidDate(existing?.startDate) ? dateToIso(existing.startDate) : null;
+      const storedEndStr     = isValidDate(existing?.endDate)   ? dateToIso(existing.endDate)   : null;
+      const canonicalStartStr = canonicalStart ? dateToIso(canonicalStart) : null;
+      const canonicalEndStr   = canonicalEnd   ? dateToIso(canonicalEnd)   : null;
+
+      // Re-seed whenever computed dates differ from stored (overrides stale/epoch values)
+      const needsDateSeed = storedStartStr !== canonicalStartStr || storedEndStr !== canonicalEndStr;
       const needsSoldHrsSeed = existing?.soldHrs == null && !!soData;
       if (!needsDateSeed && !needsSoldHrsSeed) continue;
 
-      // Odoo project dates primary → HS dates fallback → keep existing valid date
-      const startDate =
-        isValidDate(existing?.startDate) ? existing.startDate
-        : projDates.startDate ?? parseHsDate(d.properties.project_start_date);
-      const endDate =
-        isValidDate(existing?.endDate) ? existing.endDate
-        : projDates.endDate ?? parseHsDate(d.properties.project_end_date);
+      const startDate = canonicalStart;
+      const endDate = canonicalEnd;
 
       let soldHrs = existing?.soldHrs ?? null;
       if (needsSoldHrsSeed && soData) {
@@ -169,9 +177,13 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     const manual = manualMap.get(id);
     const soData = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
     const projDates = soData ? getSoProjectDates(soData) : { startDate: null, endDate: null };
-    // Valid manual date → live Odoo project dates → null (epoch treated as missing)
-    const startDate = isValidDate(manual?.startDate) ? dateToIso(manual.startDate) : dateToIso(projDates.startDate);
-    const endDate = isValidDate(manual?.endDate) ? dateToIso(manual.endDate) : dateToIso(projDates.endDate);
+    // Dates: fully live — SO+projects → project dates; SO only → SO date_order / null; no SO → HS createdate / null
+    const startDate: string | null = soData
+      ? (projDates.startDate
+          ? dateToIso(projDates.startDate)
+          : (soData.date_order && soData.date_order !== false ? String(soData.date_order).substring(0, 10) : null))
+      : dateToIso(parseHsDate(d.properties.createdate));
+    const endDate: string | null = soData ? dateToIso(projDates.endDate) : null;
     const hsPipeline = d.properties.pipeline ?? null;
     const hsStage = d.properties.dealstage ?? null;
 

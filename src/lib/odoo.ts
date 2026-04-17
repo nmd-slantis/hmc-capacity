@@ -18,6 +18,7 @@ export interface OdooSoData {
   x_studio_sold_hours: number | false | null;
   x_studio_project_start_date: string | false | null;
   x_studio_project_end_date: string | false | null;
+  date_order?: string | false | null;
 }
 
 export interface OdooProjectDates {
@@ -90,7 +91,7 @@ export async function fetchOdooSosByNames(names: string[]): Promise<Map<string, 
   const uid = await authenticate();
   const result = await executeKw(uid, 'sale.order', 'search_read',
     [[['name', 'in', names]]],
-    { fields: ['id', 'name', 'project_ids', 'x_studio_sold_hours', 'x_studio_project_start_date', 'x_studio_project_end_date'], context: { lang: 'en_US', tz: 'UTC' } },
+    { fields: ['id', 'name', 'project_ids', 'x_studio_sold_hours', 'x_studio_project_start_date', 'x_studio_project_end_date', 'date_order'], context: { lang: 'en_US', tz: 'UTC' } },
   );
   const map = new Map<string, OdooSoData>();
   for (const so of (result as (OdooSoData & { name: string })[]) ?? []) map.set(so.name, so);
