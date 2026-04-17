@@ -151,6 +151,7 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     </div>
                   </th>
                 ))}
+                <th className="bg-[#202022]" />{/* Comments — keeps header row fully black */}
               </tr>
 
               {/* Row 2 — sub-headers */}
