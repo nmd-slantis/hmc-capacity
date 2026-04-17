@@ -36,11 +36,6 @@ function computeStatus(start: string | null, end: string | null): RowStatus {
   return "ongoing";
 }
 
-function isoDate(val: string | false | null | undefined): string | null {
-  if (!val) return null;
-  return val.substring(0, 10);
-}
-
 function dateToIso(d: Date | string | null | undefined): string | null {
   if (!d) return null;
   return d instanceof Date ? d.toISOString().substring(0, 10) : String(d).substring(0, 10);
