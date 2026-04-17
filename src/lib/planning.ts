@@ -1,4 +1,4 @@
-import { fetchOdooProjects, fetchOdooSoDetails, fetchOdooSosByNames, fetchOdooProjectDates, extractSoNumber, type OdooSoData, type OdooProjectDates } from "./odoo";
+import { fetchOdooSosByNames, fetchOdooProjectDates, type OdooSoData, type OdooProjectDates } from "./odoo";
 import { fetchHubspotDeals, fetchHubSpotPortalId } from "./hubspot";
 import { prisma } from "./prisma";
 import type { PlanningRow, RowStatus } from "@/types/planning";
@@ -13,13 +13,6 @@ function hsGroup(pipeline: string | null, stage: string | null): string {
   if (stage === HS_CLOSED_LOST_STAGE) return "Closed Lost";
   return "Sales Pipeline";
 }
-
-const ODOO_GROUP: Record<RowStatus, string> = {
-  ongoing: "Ongoing",
-  todo:    "To-Do",
-  done:    "Completed",
-  undated: "No Dates",
-};
 
 const GROUP_ORDER: Record<string, number> = {
   "Ongoing":          0,
@@ -36,10 +29,8 @@ function computeStatus(start: string | null, end: string | null): RowStatus {
   if (!start && !end) return "undated";
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-
   const startD = start ? new Date(start) : null;
   const endD = end ? new Date(end) : null;
-
   if (endD && endD < today) return "done";
   if (startD && startD > today) return "todo";
   return "ongoing";
@@ -47,20 +38,17 @@ function computeStatus(start: string | null, end: string | null): RowStatus {
 
 function isoDate(val: string | false | null | undefined): string | null {
   if (!val) return null;
-  // Odoo returns "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"
   return val.substring(0, 10);
 }
 
+function dateToIso(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  return d instanceof Date ? d.toISOString().substring(0, 10) : String(d).substring(0, 10);
+}
+
 export async function buildPlanningRows(): Promise<PlanningRow[]> {
-  const [odooProjects, hubspotDeals, allManualData, hsPortalId] = await Promise.all([
-    fetchOdooProjects().catch((e) => {
-      console.error("Odoo fetch failed:", e);
-      return [];
-    }),
-    fetchHubspotDeals().catch((e) => {
-      console.error("HubSpot fetch failed:", e);
-      return [];
-    }),
+  const [hubspotDeals, allManualData, hsPortalId] = await Promise.all([
+    fetchHubspotDeals().catch((e) => { console.error("HubSpot fetch failed:", e); return []; }),
     prisma.manualData.findMany(),
     fetchHubSpotPortalId().catch(() => null),
   ]);
@@ -71,138 +59,43 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       {
         ...m,
         monthlyData: (() => {
-          try {
-            return JSON.parse(m.monthlyData) as Record<string, number>;
-          } catch {
-            return {} as Record<string, number>;
-          }
+          try { return JSON.parse(m.monthlyData) as Record<string, number>; }
+          catch { return {} as Record<string, number>; }
         })(),
       },
     ])
   );
 
-  // ── Seed SO data for unseeded Odoo projects ──────────────────────────────
-  try {
-    // Collect projects that have a sale_order_id and haven't been seeded yet
-    const unseeded = odooProjects.filter(
-      (p) =>
-        Array.isArray(p.sale_order_id) &&
-        !manualMap.get(`odoo-${p.id}`)?.soSeeded
-    );
-
-    if (unseeded.length > 0) {
-      const soIds = unseeded.map((p) => (p.sale_order_id as [number, string])[0]);
-      const soDetails = await fetchOdooSoDetails(soIds);
-
-      for (const p of unseeded) {
-        const rowId = `odoo-${p.id}`;
-        const soId = (p.sale_order_id as [number, string])[0];
-        const so = soDetails.get(soId);
-        if (!so) continue;
-
-        const existing = manualMap.get(rowId);
-
-        const rawHrs = so.x_studio_sold_hours;
-        const parsedHrs = rawHrs !== false && rawHrs !== null && rawHrs !== undefined
-          ? parseFloat(String(rawHrs))
-          : NaN;
-        const soldHrs = !isNaN(parsedHrs) && parsedHrs > 0
-          ? parsedHrs
-          : existing?.soldHrs ?? null;
-
-        // Only set dates if not already manually set
-        const startDate =
-          existing?.startDate !== undefined && existing.startDate !== null
-            ? existing.startDate
-            : so.x_studio_project_start_date
-            ? new Date(isoDate(so.x_studio_project_start_date) as string)
-            : existing?.startDate ?? null;
-
-        const endDate =
-          existing?.endDate !== undefined && existing.endDate !== null
-            ? existing.endDate
-            : so.x_studio_project_end_date
-            ? new Date(isoDate(so.x_studio_project_end_date) as string)
-            : existing?.endDate ?? null;
-
-        const upsertData = {
-          id: rowId,
-          source: "odoo",
-          sourceId: String(p.id),
-          soSeeded: true,
-          soldHrs,
-          startDate,
-          endDate,
-          effort: existing?.effort ?? null,
-          monthlyData: existing
-            ? JSON.stringify(existing.monthlyData)
-            : "{}",
-        };
-
-        await prisma.manualData.upsert({
-          where: { id: rowId },
-          create: upsertData,
-          update: upsertData,
-        });
-
-        // Update in-memory map so rows built below see seeded values
-        manualMap.set(rowId, {
-          ...(existing ?? {
-            id: rowId,
-            source: "odoo",
-            sourceId: String(p.id),
-            effort: null,
-            updatedAt: new Date(),
-            monthlyData: {},
-          }),
-          soSeeded: true,
-          soldHrs,
-          startDate,
-          endDate,
-        } as typeof existing & { soSeeded: boolean; soldHrs: number | null; startDate: Date | null; endDate: Date | null; monthlyData: Record<string, number> });
-      }
-    }
-  } catch (e) {
-    console.error("SO seeding failed (non-fatal):", e);
-  }
-  // ────────────────────────────────────────────────────────────────────────
-
-  // ── Seed HubSpot deals: dates (from HS) + soldHrs + odooSoUrl (from Odoo SO) ──
-  // HubSpot returns date properties as Unix ms timestamps (string)
+  // ── Fetch Odoo SO data for all HS deals that have a SO name ──────────────
   const parseHsDate = (v: string | null | undefined): Date | null => {
     if (!v) return null;
     const ts = parseInt(v);
     return isNaN(ts) ? null : new Date(ts);
   };
 
-  // Fetch Odoo SO data for all HS deals that have a SO name
   let hsSoMap = new Map<string, OdooSoData>();
   try {
     const soNames = hubspotDeals
       .map((d) => d.properties.sales_order)
       .filter((s): s is string => !!s && s.trim() !== "");
-    if (soNames.length > 0) {
-      hsSoMap = await fetchOdooSosByNames(soNames);
-    }
+    if (soNames.length > 0) hsSoMap = await fetchOdooSosByNames(soNames);
   } catch (e) {
     console.error("HubSpot SO Odoo lookup failed (non-fatal):", e);
   }
 
-  // Fetch project dates for all projects linked to those SOs
+  // ── Fetch project dates for all project_ids linked to those SOs ──────────
   let projectDatesMap = new Map<number, OdooProjectDates>();
   try {
     const projectIds = new Set<number>();
     for (const so of Array.from(hsSoMap.values())) {
       for (const pid of so.project_ids ?? []) projectIds.add(pid);
     }
-    if (projectIds.size > 0) {
-      projectDatesMap = await fetchOdooProjectDates(Array.from(projectIds));
-    }
+    if (projectIds.size > 0) projectDatesMap = await fetchOdooProjectDates(Array.from(projectIds));
   } catch (e) {
     console.error("Odoo project dates fetch failed (non-fatal):", e);
   }
 
-  /** Min start date + max end date across all projects linked to a SO */
+  /** Min start + max end across all Odoo projects linked to a SO */
   const getSoProjectDates = (so: OdooSoData): { startDate: Date | null; endDate: Date | null } => {
     const starts: number[] = [];
     const ends: number[] = [];
@@ -223,6 +116,7 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     };
   };
 
+  // ── Seed manual data for unseeded HubSpot deals ──────────────────────────
   try {
     for (const d of hubspotDeals) {
       const rowId = `hubspot-${d.id}`;
@@ -232,127 +126,54 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
 
       const needsFullSeed = !existing?.soSeeded &&
         (projDates.startDate || projDates.endDate || d.properties.project_start_date || d.properties.project_end_date || soData);
-      const needsSoldHrsSeed = (existing?.soldHrs == null) && !!soData;
-
+      const needsSoldHrsSeed = existing?.soldHrs == null && !!soData;
       if (!needsFullSeed && !needsSoldHrsSeed) continue;
 
-      // Project dates primary → HS dates fallback → keep existing
+      // Odoo project dates primary → HS dates fallback → keep existing
       const startDate =
-        existing?.startDate !== undefined && existing.startDate !== null
-          ? existing.startDate
-          : projDates.startDate ?? parseHsDate(d.properties.project_start_date);
-
+        existing?.startDate != null ? existing.startDate
+        : projDates.startDate ?? parseHsDate(d.properties.project_start_date);
       const endDate =
-        existing?.endDate !== undefined && existing.endDate !== null
-          ? existing.endDate
-          : projDates.endDate ?? parseHsDate(d.properties.project_end_date);
+        existing?.endDate != null ? existing.endDate
+        : projDates.endDate ?? parseHsDate(d.properties.project_end_date);
 
       let soldHrs = existing?.soldHrs ?? null;
       if (needsSoldHrsSeed && soData) {
         const rawHrs = soData.x_studio_sold_hours;
-        const parsed = rawHrs !== false && rawHrs != null
-          ? parseFloat(String(rawHrs)) : NaN;
+        const parsed = rawHrs !== false && rawHrs != null ? parseFloat(String(rawHrs)) : NaN;
         if (!isNaN(parsed) && parsed > 0) soldHrs = parsed;
       }
 
       const upsertData = {
-        id: rowId,
-        source: "hubspot",
-        sourceId: d.id,
-        soSeeded: true,
-        soldHrs,
-        startDate,
-        endDate,
+        id: rowId, source: "hubspot", sourceId: d.id, soSeeded: true,
+        soldHrs, startDate, endDate,
         effort: existing?.effort ?? null,
         monthlyData: existing ? JSON.stringify(existing.monthlyData) : "{}",
       };
 
-      await prisma.manualData.upsert({
-        where: { id: rowId },
-        create: upsertData,
-        update: upsertData,
-      });
+      await prisma.manualData.upsert({ where: { id: rowId }, create: upsertData, update: upsertData });
 
       manualMap.set(rowId, {
-        ...(existing ?? {
-          id: rowId,
-          source: "hubspot",
-          sourceId: d.id,
-          effort: null,
-          updatedAt: new Date(),
-          monthlyData: {},
-        }),
-        soSeeded: true,
-        soldHrs,
-        startDate,
-        endDate,
+        ...(existing ?? { id: rowId, source: "hubspot", sourceId: d.id, effort: null, updatedAt: new Date(), monthlyData: {} }),
+        soSeeded: true, soldHrs, startDate, endDate,
       } as typeof existing & { soSeeded: boolean; soldHrs: number | null; startDate: Date | null; endDate: Date | null; monthlyData: Record<string, number> });
     }
   } catch (e) {
     console.error("HubSpot seeding failed (non-fatal):", e);
   }
-  // ────────────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   const rows: PlanningRow[] = [];
-
-  for (const p of odooProjects) {
-    const id = `odoo-${p.id}`;
-    const manual = manualMap.get(id);
-
-    // Use manual dates (seeded or manually set) falling back to Odoo project dates
-    const startDate =
-      manual?.startDate
-        ? (manual.startDate instanceof Date
-            ? manual.startDate.toISOString().substring(0, 10)
-            : String(manual.startDate).substring(0, 10))
-        : isoDate(p.date_start);
-    const endDate =
-      manual?.endDate
-        ? (manual.endDate instanceof Date
-            ? manual.endDate.toISOString().substring(0, 10)
-            : String(manual.endDate).substring(0, 10))
-        : isoDate(p.date);
-
-    const status = computeStatus(startDate, endDate);
-    rows.push({
-      id,
-      source: "odoo",
-      name: p.name,
-      startDate,
-      endDate,
-      effort: manual?.effort ?? null,
-      soldHrs: manual?.soldHrs ?? null,
-      so: extractSoNumber(p),
-      monthlyData: manual?.monthlyData ?? {},
-      status,
-      hsPipeline: null,
-      hsStage: null,
-      hsUrl: null,
-      odooSoUrl: Array.isArray(p.sale_order_id)
-        ? `${process.env.ODOO_URL}/web#id=${(p.sale_order_id as [number, string])[0]}&cids=1-2-3&menu_id=336&action=483&model=sale.order&view_type=form`
-        : null,
-      group: ODOO_GROUP[status],
-    });
-  }
 
   for (const d of hubspotDeals) {
     const id = `hubspot-${d.id}`;
     const manual = manualMap.get(id);
-
-    // Dates for HubSpot deals come from manual data only
-    const startDate = manual?.startDate
-      ? (manual.startDate instanceof Date
-          ? manual.startDate.toISOString().substring(0, 10)
-          : String(manual.startDate).substring(0, 10))
-      : null;
-    const endDate = manual?.endDate
-      ? (manual.endDate instanceof Date
-          ? manual.endDate.toISOString().substring(0, 10)
-          : String(manual.endDate).substring(0, 10))
-      : null;
-
+    const startDate = dateToIso(manual?.startDate);
+    const endDate = dateToIso(manual?.endDate);
     const hsPipeline = d.properties.pipeline ?? null;
     const hsStage = d.properties.dealstage ?? null;
+    const soData = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
+
     rows.push({
       id,
       source: "hubspot",
@@ -367,15 +188,13 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       hsPipeline,
       hsStage,
       hsUrl: hsPortalId ? `https://app.hubspot.com/contacts/${hsPortalId}/deal/${d.id}` : null,
-      odooSoUrl: (() => {
-        const so = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
-        return so ? `${process.env.ODOO_URL}/web#id=${so.id}&cids=1-2-3&menu_id=336&action=483&model=sale.order&view_type=form` : null;
-      })(),
+      odooSoUrl: soData
+        ? `${process.env.ODOO_URL}/web#id=${soData.id}&cids=1-2-3&menu_id=336&action=483&model=sale.order&view_type=form`
+        : null,
       group: hsGroup(hsPipeline, hsStage),
     });
   }
 
   rows.sort((a, b) => (GROUP_ORDER[a.group] ?? 99) - (GROUP_ORDER[b.group] ?? 99));
-
   return rows;
 }
