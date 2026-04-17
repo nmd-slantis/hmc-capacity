@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import type { ActiveTab } from "./HmcClientLayout";
 
 interface CollapsibleHeaderProps {
   email: string | null | undefined;
   today: string;
   rowCount: number;
   signOut: () => Promise<void>;
+  activeTab?: ActiveTab;
+  onTabChange?: (tab: ActiveTab) => void;
 }
 
-export function CollapsibleHeader({ email, today, rowCount, signOut }: CollapsibleHeaderProps) {
+export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, onTabChange }: CollapsibleHeaderProps) {
   const [open, setOpen] = useState(true);
 
   return (
@@ -30,9 +33,25 @@ export function CollapsibleHeader({ email, today, rowCount, signOut }: Collapsib
           >
             HMC Architects
           </span>
-          <span className="ml-2 text-[10px] bg-[#FF7700]/20 text-[#FF7700] px-2 py-0.5 rounded-full font-medium uppercase tracking-wider border border-[#FF7700]/30">
-            Planning
-          </span>
+
+          {/* Tab buttons */}
+          {onTabChange && (
+            <div className="flex items-center gap-1 ml-2">
+              {(["planning", "admin"] as ActiveTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => onTabChange(tab)}
+                  className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border transition-colors ${
+                    activeTab === tab
+                      ? "bg-[#FF7700] text-white border-[#FF7700]"
+                      : "text-[#FF7700] border-[#FF7700]/40 hover:bg-[#FF7700]/10"
+                  }`}
+                >
+                  {tab === "planning" ? "Planning" : "Administration"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <button

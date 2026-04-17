@@ -1,8 +1,7 @@
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { buildPlanningRows } from "@/lib/planning";
-import { TabView } from "@/components/TabView";
-import { CollapsibleHeader } from "@/components/CollapsibleHeader";
+import { HmcClientLayout } from "@/components/HmcClientLayout";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +24,13 @@ export default async function HmcPage() {
 
   return (
     <div className="min-h-screen bg-[#f5f5f5]">
-      <CollapsibleHeader
+      <HmcClientLayout
+        initialRows={rows}
         email={session.user?.email}
         today={today}
         rowCount={rows.length}
         signOut={signOutAction}
       />
-
-      <main className="px-6 py-6 pb-10">
-        <TabView initialRows={rows} />
-      </main>
 
       <footer className="px-6 py-4 text-center text-[10px] text-gray-400">
         Powered by{" "}
