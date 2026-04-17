@@ -72,8 +72,13 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
   const TABLE_MIN_WIDTH = showMonths ? TABLE_MIN_WIDTH_MONTHS : TABLE_MIN_WIDTH_NO_MONTHS;
 
   const handleSort = (key: string) => {
-    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(key); setSortDir("asc"); }
+    if (sortKey === key) {
+      if (sortDir === "asc") setSortDir("desc");
+      else { setSortKey(null); setSortDir("asc"); }
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
   };
 
   const sortRows = (rows: PlanningRow[]) => {
