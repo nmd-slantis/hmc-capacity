@@ -89,21 +89,6 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
         </span>
       </td>
 
-      {/* Odoo SO link */}
-      <td className="px-2 py-2 text-center">
-        {row.odooSoUrl ? (
-          <a
-            href={row.odooSoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#714B67] hover:opacity-80 transition-opacity"
-            title="Open Sales Order in Odoo"
-          >
-            <OdooMark />
-          </a>
-        ) : null}
-      </td>
-
       {/* HubSpot link */}
       <td className="px-2 py-2 text-center">
         {row.source === "hubspot" && (
@@ -118,6 +103,21 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
             <HubSpotMark />
           </a>
         )}
+      </td>
+
+      {/* Odoo SO link */}
+      <td className="px-2 py-2 text-center">
+        {row.odooSoUrl ? (
+          <a
+            href={row.odooSoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#714B67] hover:opacity-80 transition-opacity"
+            title="Open Sales Order in Odoo"
+          >
+            <OdooMark />
+          </a>
+        ) : null}
       </td>
 
       {/* Start date — editable for ALL rows */}

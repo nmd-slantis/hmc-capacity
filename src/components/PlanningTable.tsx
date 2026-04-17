@@ -33,8 +33,8 @@ function TableColgroup() {
   return (
     <colgroup>
       <col style={{ width: "260px" }} />
-      <col style={{ width: "50px" }} />{/* ODOO */}
       <col style={{ width: "50px" }} />{/* HS */}
+      <col style={{ width: "50px" }} />{/* ODOO */}
       <col style={{ width: "95px" }} />
       <col style={{ width: "95px" }} />
       <col style={{ width: "65px" }} />{/* Sold Hrs */}
@@ -185,8 +185,25 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     </div>
                   )}
                 </th>
-                <th className="px-2 py-1.5 text-center">Odoo</th>
-                <th className="px-2 py-1.5 text-center">HS</th>
+                <th className="px-2 py-1.5 text-center">
+                  {/* HubSpot sprocket */}
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline-block" aria-label="HubSpot">
+                    <circle cx="12" cy="12" r="3" fill="white" />
+                    <rect x="11" y="5.5" width="2" height="4.5" rx="1" fill="white" />
+                    <circle cx="12" cy="4.5" r="2.5" fill="white" />
+                    <line x1="14.2" y1="13.5" x2="17.5" y2="16" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                    <circle cx="19" cy="17.2" r="2.5" fill="white" />
+                    <line x1="9.8" y1="13.5" x2="6.5" y2="16" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                    <circle cx="5" cy="17.2" r="2.5" fill="white" />
+                  </svg>
+                </th>
+                <th className="px-2 py-1.5 text-center">
+                  {/* Odoo O mark */}
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline-block" aria-label="Odoo">
+                    <circle cx="12" cy="12" r="5.5" fill="none" stroke="white" strokeWidth="2.5" />
+                    <circle cx="12" cy="5.5" r="2" fill="white" />
+                  </svg>
+                </th>
                 <th className="px-2 py-1.5 text-left">Start</th>
                 <th className="px-2 py-1.5 text-left">Finish</th>
                 <th className="px-2 py-1.5 text-right">Sold Hrs</th>
