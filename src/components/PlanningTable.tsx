@@ -119,9 +119,12 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Active filter: hide rows at "Project Closure" stage whose end date has already passed
+  // Active filter:
+  //   1. Hide "Project Closure" deals whose end date has already passed
+  //   2. Hide Closed Won / Closed Lost deals with no Sales Order
   const afterActiveFilter = activeOnly
     ? initialRows.filter((r) => {
+        if ((r.group === "Closed Won" || r.group === "Closed Lost") && !r.so) return false;
         if (r.hsStage !== "988280923") return true;
         const end = r.endDate ? new Date(r.endDate) : null;
         return end !== null && end >= today;
