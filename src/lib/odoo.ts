@@ -92,9 +92,16 @@ export function extractSoNumber(project: OdooProject): string | null {
 export interface OdooSoData {
   id: number;
   name?: string;
+  project_ids?: number[];
   x_studio_sold_hours: number | false | null;
   x_studio_project_start_date: string | false | null;
   x_studio_project_end_date: string | false | null;
+}
+
+export interface OdooProjectDates {
+  id: number;
+  date_start: string | false | null;
+  date: string | false | null;
 }
 
 /** Search sale.orders by SO name (e.g. "S00042") and return a map keyed by name */
@@ -111,7 +118,7 @@ export async function fetchOdooSosByNames(names: string[]): Promise<Map<string, 
         method: "search_read",
         args: [[["name", "in", names]]],
         kwargs: {
-          fields: ["id", "name", "x_studio_sold_hours", "x_studio_project_start_date", "x_studio_project_end_date"],
+          fields: ["id", "name", "project_ids", "x_studio_sold_hours", "x_studio_project_start_date", "x_studio_project_end_date"],
           uid,
           context: { lang: "en_US", tz: "UTC" },
         },
@@ -153,5 +160,34 @@ export async function fetchOdooSoDetails(soIds: number[]): Promise<Map<number, O
   if (json.error) throw new Error(`Odoo SO RPC error: ${JSON.stringify(json.error)}`);
   const map = new Map<number, OdooSoData>();
   for (const so of (json.result ?? []) as OdooSoData[]) map.set(so.id, so);
+  return map;
+}
+
+/** Fetch date_start + date for a list of project IDs */
+export async function fetchOdooProjectDates(projectIds: number[]): Promise<Map<number, OdooProjectDates>> {
+  if (!projectIds.length) return new Map();
+  const uid = await authenticate();
+  const res = await fetch(`${process.env.ODOO_URL}/web/dataset/call_kw`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0", method: "call", id: 5,
+      params: {
+        model: "project.project",
+        method: "search_read",
+        args: [[["id", "in", projectIds]]],
+        kwargs: {
+          fields: ["id", "date_start", "date"],
+          uid,
+          context: { lang: "en_US", tz: "UTC" },
+        },
+      },
+    }),
+    next: { revalidate: 300 },
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(`Odoo project dates RPC error: ${JSON.stringify(json.error)}`);
+  const map = new Map<number, OdooProjectDates>();
+  for (const p of (json.result ?? []) as OdooProjectDates[]) map.set(p.id, p);
   return map;
 }

@@ -1,4 +1,4 @@
-import { fetchOdooProjects, fetchOdooSoDetails, fetchOdooSosByNames, extractSoNumber, type OdooSoData } from "./odoo";
+import { fetchOdooProjects, fetchOdooSoDetails, fetchOdooSosByNames, fetchOdooProjectDates, extractSoNumber, type OdooSoData, type OdooProjectDates } from "./odoo";
 import { fetchHubspotDeals, fetchHubSpotPortalId } from "./hubspot";
 import { prisma } from "./prisma";
 import type { PlanningRow, RowStatus } from "@/types/planning";
@@ -188,27 +188,64 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     console.error("HubSpot SO Odoo lookup failed (non-fatal):", e);
   }
 
+  // Fetch project dates for all projects linked to those SOs
+  let projectDatesMap = new Map<number, OdooProjectDates>();
+  try {
+    const projectIds = new Set<number>();
+    for (const so of hsSoMap.values()) {
+      for (const pid of so.project_ids ?? []) projectIds.add(pid);
+    }
+    if (projectIds.size > 0) {
+      projectDatesMap = await fetchOdooProjectDates([...projectIds]);
+    }
+  } catch (e) {
+    console.error("Odoo project dates fetch failed (non-fatal):", e);
+  }
+
+  /** Min start date + max end date across all projects linked to a SO */
+  const getSoProjectDates = (so: OdooSoData): { startDate: Date | null; endDate: Date | null } => {
+    const starts: number[] = [];
+    const ends: number[] = [];
+    for (const pid of so.project_ids ?? []) {
+      const proj = projectDatesMap.get(pid);
+      if (proj?.date_start) {
+        const d = new Date(String(proj.date_start).substring(0, 10));
+        if (!isNaN(d.getTime())) starts.push(d.getTime());
+      }
+      if (proj?.date) {
+        const d = new Date(String(proj.date).substring(0, 10));
+        if (!isNaN(d.getTime())) ends.push(d.getTime());
+      }
+    }
+    return {
+      startDate: starts.length > 0 ? new Date(Math.min(...starts)) : null,
+      endDate: ends.length > 0 ? new Date(Math.max(...ends)) : null,
+    };
+  };
+
   try {
     for (const d of hubspotDeals) {
       const rowId = `hubspot-${d.id}`;
       const existing = manualMap.get(rowId);
       const soData = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
+      const projDates = soData ? getSoProjectDates(soData) : { startDate: null, endDate: null };
 
       const needsFullSeed = !existing?.soSeeded &&
-        (d.properties.project_start_date || d.properties.project_end_date || soData);
+        (projDates.startDate || projDates.endDate || d.properties.project_start_date || d.properties.project_end_date || soData);
       const needsSoldHrsSeed = (existing?.soldHrs == null) && !!soData;
 
       if (!needsFullSeed && !needsSoldHrsSeed) continue;
 
+      // Project dates primary → HS dates fallback → keep existing
       const startDate =
         existing?.startDate !== undefined && existing.startDate !== null
           ? existing.startDate
-          : parseHsDate(d.properties.project_start_date);
+          : projDates.startDate ?? parseHsDate(d.properties.project_start_date);
 
       const endDate =
         existing?.endDate !== undefined && existing.endDate !== null
           ? existing.endDate
-          : parseHsDate(d.properties.project_end_date);
+          : projDates.endDate ?? parseHsDate(d.properties.project_end_date);
 
       let soldHrs = existing?.soldHrs ?? null;
       if (needsSoldHrsSeed && soData) {
