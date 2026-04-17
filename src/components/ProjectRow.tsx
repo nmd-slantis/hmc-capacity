@@ -150,8 +150,25 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
       </td>
 
       {/* SO */}
-      <td className="px-2 py-1 text-center text-gray-500 border-r-2 border-gray-200">
+      <td className="px-2 py-1 text-center text-gray-500">
         {row.so ?? ""}
+      </td>
+
+      {/* Comments */}
+      <td className="px-2 py-1">
+        <EditableCell rowId={row.id} field="comments"
+          value={row.comments} type="text"
+          onSaved={(v) => updateField("comments", (v as string | null))}
+          className="text-gray-700 text-xs" placeholder="…" />
+      </td>
+
+      {/* Approved */}
+      <td className="px-2 py-1 text-center border-r-2 border-gray-200">
+        <ApprovedCheckbox
+          rowId={row.id}
+          checked={row.approved}
+          onChange={(v) => updateField("approved", v)}
+        />
       </td>
 
       {/* Monthly columns */}
@@ -180,13 +197,37 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
         );
       })}
 
-      {/* Comments */}
-      <td className="px-2 py-1">
-        <EditableCell rowId={row.id} field="comments"
-          value={row.comments} type="text"
-          onSaved={(v) => updateField("comments", (v as string | null))}
-          className="text-gray-700 text-xs" placeholder="…" />
-      </td>
     </tr>
+  );
+}
+
+function ApprovedCheckbox({ rowId, checked, onChange }: {
+  rowId: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.checked;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/planning/${rowId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved: val }),
+      });
+      if (res.ok) onChange(val);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={handleChange}
+      disabled={saving}
+      className="w-4 h-4 accent-[#FF7700] cursor-pointer disabled:opacity-40"
+    />
   );
 }

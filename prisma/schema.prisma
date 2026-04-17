@@ -21,6 +21,7 @@ model ManualData {
   soldHrs     Float?
   soSeeded    Boolean   @default(false)
   comments    String?
+  approved    Boolean   @default(false)
   updatedAt   DateTime  @updatedAt
 }
 

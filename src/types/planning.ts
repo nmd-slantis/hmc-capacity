@@ -18,5 +18,6 @@ export interface PlanningRow {
   hsUrl: string | null;       // Direct link to the HubSpot deal (hubspot rows only)
   odooSoUrl: string | null;   // Direct link to the Odoo Sales Order (odoo rows only)
   comments: string | null;
+  approved: boolean;
   group: string;              // display group label, used for section headers
 }

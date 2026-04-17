@@ -95,6 +95,12 @@ export async function PATCH(
     data.comments = existing.comments;
   }
 
+  if (body.approved !== undefined) {
+    data.approved = Boolean(body.approved);
+  } else {
+    data.approved = existing?.approved ?? false;
+  }
+
   const record = await prisma.manualData.upsert({
     where: { id },
     create: data,

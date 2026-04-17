@@ -39,14 +39,15 @@ function TableColgroup() {
       <col style={{ width: "95px" }} />
       <col style={{ width: "65px" }} />{/* Sold Hrs */}
       <col style={{ width: "75px" }} />{/* Effort Hrs */}
-      <col style={{ width: "75px" }} />
+      <col style={{ width: "75px" }} />{/* SO */}
+      <col style={{ width: "150px" }} />{/* Comments */}
+      <col style={{ width: "80px" }} />{/* Approved */}
       {VISIBLE_MONTHS.map((m) => (
         <React.Fragment key={m.key}>
           <col style={{ width: "56px" }} />
           <col style={{ width: "40px" }} />
         </React.Fragment>
       ))}
-      <col style={{ width: "160px" }} />{/* Comments */}
     </colgroup>
   );
 }
@@ -131,7 +132,7 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
               {/* Row 1 — month labels */}
               <tr className="bg-[#202022] text-white">
                 <th colSpan={1} className="px-3 py-2 border-r-2 border-gray-600" />
-                <th colSpan={7} className="border-r-2 border-gray-600" />
+                <th colSpan={9} className="border-r-2 border-gray-600" />
                 {VISIBLE_MONTHS.map((m, i) => (
                   <th
                     key={m.key}
@@ -151,7 +152,6 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     </div>
                   </th>
                 ))}
-                <th className="bg-[#202022]" />{/* Comments — keeps header row fully black */}
               </tr>
 
               {/* Row 2 — sub-headers */}
@@ -210,7 +210,9 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                 <th className="px-2 py-1.5 text-left">Finish</th>
                 <th className="px-2 py-1.5 text-right">Sold Hrs</th>
                 <th className="px-2 py-1.5 text-right">Effort Hrs</th>
-                <th className="px-2 py-1.5 text-center border-r-2 border-gray-600">SO</th>
+                <th className="px-2 py-1.5 text-center">SO</th>
+                <th className="px-2 py-1.5 text-left">Comments</th>
+                <th className="px-2 py-1.5 text-center border-r-2 border-gray-600">Approved?</th>
                 {VISIBLE_MONTHS.map((m, i) => (
                   <React.Fragment key={m.key}>
                     <th className={`px-1 py-1.5 text-right ${
@@ -223,7 +225,7 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     <th className="px-1 py-1.5 text-right bg-gray-800/40">FTE</th>
                   </React.Fragment>
                 ))}
-                <th className="px-2 py-1.5 text-left">Comments</th>
+
               </tr>
             </thead>
           </table>
