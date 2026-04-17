@@ -142,10 +142,10 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
       {/* Effort Hrs — computed, read-only */}
       <td className="px-2 py-1 text-right">
         <div className="flex items-center justify-end">
-          {effortDot(effortHrs, row.soldHrs)}
           <span className="text-gray-800">
             {effortHrs > 0 ? effortHrs : ""}
           </span>
+          {effortDot(effortHrs, row.soldHrs)}
         </div>
       </td>
 
