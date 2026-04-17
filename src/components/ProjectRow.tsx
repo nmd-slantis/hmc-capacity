@@ -58,6 +58,12 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
 
   const rowClass = GROUP_ROW_CLASS[row.group] ?? "bg-white border-gray-100";
 
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${m}/${d}/${y}`;
+  };
+
   const projectedMonthly = (row.soldHrs && row.startDate && row.endDate)
     ? distributeHours(row.soldHrs, row.startDate, row.endDate, VISIBLE_MONTHS)
     : {};
@@ -104,12 +110,12 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
 
       {/* Start date — read-only */}
       <td className="px-2 py-1 whitespace-nowrap text-gray-700">
-        {row.startDate ?? ""}
+        {fmtDate(row.startDate)}
       </td>
 
       {/* End date — read-only */}
       <td className="px-2 py-1 whitespace-nowrap text-gray-700">
-        {row.endDate ?? ""}
+        {fmtDate(row.endDate)}
       </td>
 
       {/* Effort Hrs — read-only */}
