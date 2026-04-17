@@ -76,8 +76,8 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
   const sortRows = (rows: PlanningRow[]) => {
     if (!sortKey) return rows;
     return [...rows].sort((a, b) => {
-      const av = (a as Record<string, unknown>)[sortKey] ?? "";
-      const bv = (b as Record<string, unknown>)[sortKey] ?? "";
+      const av = (a as unknown as Record<string, unknown>)[sortKey] ?? "";
+      const bv = (b as unknown as Record<string, unknown>)[sortKey] ?? "";
       const cmp = String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0;
       return sortDir === "asc" ? cmp : -cmp;
     });
