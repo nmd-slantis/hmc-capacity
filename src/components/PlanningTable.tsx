@@ -65,6 +65,23 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const [activeOnly, setActiveOnly] = useState(true);
+  const [sortKey, setSortKey]   = useState<string | null>(null);
+  const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
+  const sortRows = (rows: PlanningRow[]) => {
+    if (!sortKey) return rows;
+    return [...rows].sort((a, b) => {
+      const av = (a as Record<string, unknown>)[sortKey] ?? "";
+      const bv = (b as Record<string, unknown>)[sortKey] ?? "";
+      const cmp = String(av) < String(bv) ? -1 : String(av) > String(bv) ? 1 : 0;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  };
 
   // All groups collapsed by default (true = collapsed)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -118,13 +135,14 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
       )
     : afterActiveFilter;
 
-  // Group rows preserving sort order
-  const groups: { label: string; rows: PlanningRow[] }[] = [];
+  // Group rows preserving sort order, then sort within each group
+  const rawGroups: { label: string; rows: PlanningRow[] }[] = [];
   for (const row of filtered) {
-    const last = groups[groups.length - 1];
+    const last = rawGroups[rawGroups.length - 1];
     if (last && last.label === row.group) last.rows.push(row);
-    else groups.push({ label: row.group, rows: [row] });
+    else rawGroups.push({ label: row.group, rows: [row] });
   }
+  const groups = rawGroups.map((g) => ({ ...g, rows: sortRows(g.rows) }));
 
   return (
     <div className="flex flex-col gap-2">
@@ -200,7 +218,11 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     </div>
                   ) : (
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] uppercase tracking-wider">Project / Deal</span>
+                      <button onClick={() => handleSort("name")}
+                        className="text-[10px] uppercase tracking-wider hover:text-white transition-colors inline-flex items-center gap-1">
+                        Project / Deal
+                        <span className="text-[9px]">{sortKey === "name" ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                      </button>
                       <button
                         onClick={() => setSearchOpen(true)}
                         className="text-gray-500 hover:text-white flex-shrink-0 transition-colors"
@@ -230,10 +252,20 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     <circle cx="12" cy="5.5" r="2" fill="white" />
                   </svg>
                 </th>
-                <th className="px-2 py-1.5 text-left">Start</th>
-                <th className="px-2 py-1.5 text-left">End</th>
-                <th className="px-2 py-1.5 text-right">Effort Hrs</th>
-                <th className="px-2 py-1.5 text-center">SO</th>
+                {(["startDate","endDate","soldHrs","so"] as const).flatMap((key, i) => {
+                  const labels: Record<string, string> = { startDate: "Start", endDate: "End", soldHrs: "Effort Hrs", so: "SO" };
+                  const aligns: Record<string, string> = { startDate: "text-left", endDate: "text-left", soldHrs: "text-right", so: "text-center" };
+                  const active = sortKey === key;
+                  return [(
+                    <th key={key} className={`px-2 py-1.5 ${aligns[key]} cursor-pointer select-none hover:text-white transition-colors`}
+                      onClick={() => handleSort(key)}>
+                      <span className="inline-flex items-center gap-1">
+                        {labels[key]}
+                        <span className="text-[9px]">{active ? (sortDir === "asc" ? "▲" : "▼") : "⇅"}</span>
+                      </span>
+                    </th>
+                  )];
+                })}
                 <th className="px-2 py-1.5 text-left">Comments</th>
                 <th className="px-2 py-1.5 text-center border-r-2 border-gray-600">Approved?</th>
                 {VISIBLE_MONTHS.map((m, i) => (
