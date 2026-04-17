@@ -33,8 +33,8 @@ function TableColgroup() {
   return (
     <colgroup>
       <col style={{ width: "260px" }} />
-      <col style={{ width: "50px" }} />{/* HS */}
-      <col style={{ width: "50px" }} />{/* ODOO */}
+      <col style={{ width: "36px" }} />{/* HS */}
+      <col style={{ width: "36px" }} />{/* ODOO */}
       <col style={{ width: "95px" }} />
       <col style={{ width: "95px" }} />
       <col style={{ width: "75px" }} />{/* Effort Hrs */}
