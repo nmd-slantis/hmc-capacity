@@ -21,6 +21,16 @@ const GROUP_ROW_CLASS: Record<string, string> = {
   "No Dates":         "bg-white border-gray-100",
 };
 
+/** DocuSign signature mark */
+function DocuSignMark() {
+  return (
+    <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" aria-hidden="true">
+      <path d="M3 15 Q6 10 9 15 Q12 20 15 15 L20 9" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="20.5" cy="8" r="2" fill="white" />
+    </svg>
+  );
+}
+
 /** Odoo "O" mark — simplified Odoo icon */
 function OdooMark() {
   return (
@@ -93,19 +103,30 @@ export function ProjectRow({ initialRow }: ProjectRowProps) {
         )}
       </td>
 
-      {/* Odoo SO link */}
+      {/* Odoo SO link — dimmed at 30% when no SO */}
       <td className="px-2 py-2 text-center">
-        {row.odooSoUrl ? (
-          <a
-            href={row.odooSoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#714B67] hover:opacity-80 transition-opacity"
-            title="Open Sales Order in Odoo"
-          >
-            <OdooMark />
-          </a>
-        ) : null}
+        <a
+          href={row.odooSoUrl ?? undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#714B67] transition-opacity ${row.odooSoUrl ? "hover:opacity-80" : "opacity-30 cursor-default"}`}
+          title={row.odooSoUrl ? "Open Sales Order in Odoo" : "No Odoo Sales Order"}
+          onClick={(e) => !row.odooSoUrl && e.preventDefault()}
+        >
+          <OdooMark />
+        </a>
+      </td>
+
+      {/* DocuSign link — placeholder, no URL yet */}
+      <td className="px-2 py-2 text-center">
+        <a
+          href={undefined}
+          className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#FFB500] opacity-30 cursor-default"
+          title="DocuSign (coming soon)"
+          onClick={(e) => e.preventDefault()}
+        >
+          <DocuSignMark />
+        </a>
       </td>
 
       {/* Start date — read-only */}

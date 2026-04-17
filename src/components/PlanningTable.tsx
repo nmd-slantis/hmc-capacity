@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { VISIBLE_MONTHS } from "@/config/months";
+import { VISIBLE_MONTHS, hoursToFte, distributeHours } from "@/config/months";
 import { ProjectRow } from "./ProjectRow";
 import type { PlanningRow } from "@/types/planning";
 
@@ -35,6 +35,7 @@ function TableColgroup() {
       <col style={{ width: "260px" }} />
       <col style={{ width: "36px" }} />{/* HS */}
       <col style={{ width: "36px" }} />{/* ODOO */}
+      <col style={{ width: "36px" }} />{/* DocuSign */}
       <col style={{ width: "95px" }} />
       <col style={{ width: "95px" }} />
       <col style={{ width: "75px" }} />{/* Effort Hrs */}
@@ -58,7 +59,7 @@ const TABLE_STYLE: React.CSSProperties = {
 };
 
 /** Minimum pixel width of a table row — sum of all colgroup widths */
-const TABLE_MIN_WIDTH = "1917px";
+const TABLE_MIN_WIDTH = "1953px";
 
 export function PlanningTable({ initialRows }: PlanningTableProps) {
   const [searchOpen, setSearchOpen]   = useState(false);
@@ -165,7 +166,7 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
               {/* Row 1 — filter toggle + month labels */}
               <tr className="bg-[#202022] text-white">
                 <th colSpan={1} className="px-3 py-2 border-r-2 border-gray-600" />
-                <th colSpan={8} className="px-3 border-r-2 border-gray-600">
+                <th colSpan={9} className="px-3 border-r-2 border-gray-600">
                   <button
                     onClick={() => setActiveOnly((v) => !v)}
                     className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded transition-colors ${
@@ -255,6 +256,13 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
                     <circle cx="12" cy="5.5" r="2" fill="white" />
                   </svg>
                 </th>
+                <th className="px-2 py-1.5 text-center">
+                  {/* DocuSign signature mark */}
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline-block" aria-label="DocuSign">
+                    <path d="M3 15 Q6 10 9 15 Q12 20 15 15 L20 9" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                    <circle cx="20.5" cy="8" r="2" fill="white" />
+                  </svg>
+                </th>
                 {(["startDate","endDate","soldHrs","so"] as const).flatMap((key) => {
                   const labels: Record<string, string> = { startDate: "Start", endDate: "End", soldHrs: "Effort Hrs", so: "SO" };
                   const aligns: Record<string, string> = { startDate: "text-left", endDate: "text-left", soldHrs: "text-right", so: "text-center" };
@@ -309,38 +317,60 @@ export function PlanningTable({ initialRows }: PlanningTableProps) {
             const style = GROUP_STYLE[label] ?? { header: "bg-gray-500 text-white", bullet: "bg-gray-300" };
             const isCollapsed = collapsed[label] ?? true;
 
-            return (
-              <div
-                key={label}
-                className="rounded-xl overflow-hidden border border-gray-200 shadow-sm"
-              >
-                {/* Group header bar — click to toggle */}
-                <div
-                  className={`px-4 py-2 cursor-pointer select-none ${style.header}`}
-                  style={{ fontFamily: "Space Grotesk, sans-serif" }}
-                  onClick={() => toggleGroup(label)}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.bullet}`} />
-                    <span className="font-semibold text-[13px] tracking-wide">{label}</span>
-                    <span className="ml-1 text-[11px] font-normal opacity-70">({rows.length})</span>
-                    <span className="ml-auto text-[11px] opacity-60">
-                      {isCollapsed ? "▼" : "▲"}
-                    </span>
-                  </div>
-                </div>
+            // Sum distributed hours per month across all rows in this group
+            const monthTotals: Record<string, number> = {};
+            for (const row of rows) {
+              if (!row.soldHrs || !row.startDate || !row.endDate) continue;
+              const dist = distributeHours(row.soldHrs, row.startDate, row.endDate, VISIBLE_MONTHS);
+              for (const [k, v] of Object.entries(dist)) {
+                monthTotals[k] = (monthTotals[k] ?? 0) + v;
+              }
+            }
 
-                {/* Data rows — hidden when collapsed */}
-                {!isCollapsed && (
-                  <table className="text-xs" style={TABLE_STYLE}>
-                    <TableColgroup />
+            return (
+              <div key={label} className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                <table className="text-xs" style={TABLE_STYLE}>
+                  <TableColgroup />
+                  <thead>
+                    {/* Group header row — click to toggle, shows month totals */}
+                    <tr
+                      className={`cursor-pointer select-none ${style.header}`}
+                      onClick={() => toggleGroup(label)}
+                    >
+                      <td colSpan={10} className="px-4 py-2.5" style={{ fontFamily: "Space Grotesk, sans-serif" }}>
+                        <div className="flex items-center gap-2.5">
+                          <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${style.bullet}`} />
+                          <span className="font-semibold text-[13px] tracking-wide">{label}</span>
+                          <span className="ml-1 text-[11px] font-normal opacity-70">({rows.length})</span>
+                          <span className="ml-auto text-[11px] opacity-60">{isCollapsed ? "▼" : "▲"}</span>
+                        </div>
+                      </td>
+                      {VISIBLE_MONTHS.map((month, i) => {
+                        const hrs = monthTotals[month.key] ?? 0;
+                        const fte = hrs > 0 ? hoursToFte(hrs, month.workdayHours) : null;
+                        return (
+                          <React.Fragment key={month.key}>
+                            <td className={`px-1 py-2.5 text-right text-[11px] font-bold ${
+                              i === 0 ? "border-l-2 border-white/20" : month.quarterStart ? "border-l-2 border-white/20" : "border-l border-white/10"
+                            }`}>
+                              {hrs > 0 ? hrs : ""}
+                            </td>
+                            <td className="px-1 py-2.5 text-right text-[10px] opacity-70">
+                              {fte !== null ? fte.toFixed(1) : ""}
+                            </td>
+                          </React.Fragment>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  {!isCollapsed && (
                     <tbody>
                       {rows.map((row) => (
                         <ProjectRow key={row.id} initialRow={row} />
                       ))}
                     </tbody>
-                  </table>
-                )}
+                  )}
+                </table>
               </div>
             );
           })}
