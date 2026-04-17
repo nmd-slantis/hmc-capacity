@@ -13,10 +13,8 @@ export async function GET() {
     const projects = await fetchOdooProjects();
     return NextResponse.json(projects);
   } catch (err) {
-    console.error("Odoo fetch error:", err);
-    return NextResponse.json(
-      { error: "Failed to fetch Odoo projects" },
-      { status: 500 }
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Odoo fetch error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
