@@ -70,7 +70,7 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
   };
 
   const isValidDate = (d: Date | null | undefined): d is Date =>
-    d != null && !isNaN(d.getTime()) && d.getTime() !== 0;
+    d != null && !isNaN(d.getTime()) && d.getFullYear() >= 2020;
 
   let hsSoMap = new Map<string, OdooSoData>();
   try {
