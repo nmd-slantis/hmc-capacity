@@ -34,8 +34,9 @@ async function authenticate(): Promise<{ uid: number; cookie: string }> {
   const setCookie = res.headers.get("set-cookie") ?? "";
   const cookie = setCookie.split(";")[0].trim(); // "session_id=abc123"
   const json = await res.json();
+  console.log("[Odoo auth] status:", res.status, "uid:", json.result?.uid, "cookie:", cookie ? cookie.substring(0, 20) + "…" : "(none)", "error:", JSON.stringify(json.error ?? null));
   if (!json.result?.uid) {
-    throw new Error("Odoo authentication failed");
+    throw new Error(`Odoo authentication failed — status ${res.status}, error: ${JSON.stringify(json.error ?? json.result ?? null)}`);
   }
   return { uid: json.result.uid as number, cookie };
 }
