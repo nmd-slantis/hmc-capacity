@@ -85,6 +85,7 @@ export async function fetchOdooProjects(): Promise<OdooProject[]> {
   );
 
   const json = await res.json();
+  console.log("[Odoo projects] count:", (json.result ?? []).length, "error:", JSON.stringify(json.error ?? null), "sample:", JSON.stringify((json.result ?? []).slice(0, 1)));
   if (json.error) {
     throw new Error(`Odoo RPC error: ${JSON.stringify(json.error)}`);
   }
