@@ -18,11 +18,9 @@ Planning coordination tool between /slantis team and HMC Architects — merges O
 
 ## Open Tasks
 
-- [ ] **Fix Odoo data loading** — visit `https://hmc-slantis.vercel.app/api/odoo/projects` (logged in) to see full error; fix `call_kw` request in `odoo.ts`; remove debug logs after fix
-- [ ] Rename local folder `C:\Claude Code\hmc-capacity` → `C:\Claude Code\hmc-planning` (do manually after closing Claude session)
 - [ ] Build user management admin UI (currently manual via Turso dashboard)
 - [ ] Month visibility toggle UI (currently `hidden: true` in `months.ts` only)
-- [ ] `prisma db push` already run (soldHrs + soSeeded columns applied to Turso)
+- [ ] Verify SO column returns human-readable name (currently numeric ID)
 
 ---
 
@@ -37,6 +35,13 @@ npm run dev            # → http://localhost:3000
 ---
 
 ## Session Log
+
+### 2026-04-17 (evening)
+- Removed collapsible header toggle — single compact black bar with title, tab pills, sign-out inline
+- Admin column order: HS/Odoo/DocuSign now admin-only (hidden in Planning); SO # and SO Confirmation between SO and Comments; Office at end
+- Body scroll area wrapped in `rounded-xl overflow-hidden` outer frame — group card corners stay rounded during horizontal scroll
+- Merged "Active only" filter into sticky Name cell of Row 2 (labeled "Active"); Planning now has 2 header rows instead of 3
+- Row 2 height unified to 36px across both Planning and Administration tabs
 
 ### 2026-04-17
 - Rebranded: Vercel `hmc-capacity` → `hmc-slantis`, GitHub → `hmc-planning`, page titles → "HMC Planning", domain → `hmc-slantis.vercel.app`
