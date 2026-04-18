@@ -171,20 +171,7 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
     <div className="flex flex-col gap-2">
 
       {/* ── FROZEN HEADER ───────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 flex flex-col rounded-xl overflow-hidden border border-gray-300 shadow-md">
-
-        {/* Filter bar — outside scroll, always visible at left */}
-        <div className="bg-[#202022] px-4 py-1.5 flex items-center gap-2 border-b border-gray-700/60">
-          <button
-            onClick={() => setActiveOnly((v) => !v)}
-            className={`flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded transition-colors ${
-              activeOnly ? "bg-[#FF7700] text-white" : "bg-gray-700 text-gray-400 hover:text-white"
-            }`}
-          >
-            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${activeOnly ? "bg-white" : "bg-gray-500"}`} />
-            Active only
-          </button>
-        </div>
+      <div className="sticky top-0 z-20 rounded-xl overflow-hidden border border-gray-300 shadow-md">
 
         {/* Scrollable header table */}
         <div ref={headerScrollRef} style={{ overflowX: "scroll", scrollbarWidth: "none" } as React.CSSProperties} className="[&::-webkit-scrollbar]:hidden">
@@ -217,8 +204,8 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                 </tr>
               )}
 
-              {/* Row 2 — sub-headers */}
-              <tr className="bg-[#2e2e30] text-gray-300 text-[10px] uppercase tracking-wider" style={{ height: "30px" }}>
+              {/* Row 2 — sub-headers (same height in both Planning and Admin) */}
+              <tr className="bg-[#2e2e30] text-gray-300 text-[10px] uppercase tracking-wider" style={{ height: "36px" }}>
                 <th className="sticky left-0 z-[1] bg-[#2e2e30] px-3 py-1 border-r-2 border-gray-600">
                   {searchOpen ? (
                     <div className="flex items-center gap-1">
@@ -239,9 +226,20 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                         className={`text-[10px] uppercase tracking-wider hover:text-white transition-colors inline-flex items-center gap-1 ${sortKey === "name" ? "text-[#FF7700]" : ""}`}>
                         Project / Deal {sortIndicator("name")}
                       </button>
-                      <button onClick={() => setSearchOpen(true)} className="text-gray-500 hover:text-white flex-shrink-0 transition-colors" aria-label="Search projects">
-                        <SearchIcon />
-                      </button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => setActiveOnly((v) => !v)}
+                          className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                            activeOnly ? "bg-[#FF7700] text-white" : "bg-gray-700 text-gray-400 hover:text-white"
+                          }`}
+                        >
+                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${activeOnly ? "bg-white" : "bg-gray-500"}`} />
+                          Active
+                        </button>
+                        <button onClick={() => setSearchOpen(true)} className="text-gray-500 hover:text-white transition-colors" aria-label="Search projects">
+                          <SearchIcon />
+                        </button>
+                      </div>
                     </div>
                   )}
                 </th>
