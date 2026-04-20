@@ -56,13 +56,19 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
   }
   return (
     <colgroup>
-      {ADMIN_COL_WIDTHS.map((w, i) => <col key={i} style={{ width: `${w}px` }} />)}
+      {ADMIN_COL_WIDTHS.map((w, i) =>
+        // Last column (Office) has no explicit width so it absorbs extra viewport space.
+        // All other columns keep their fixed px widths.
+        i < ADMIN_COL_WIDTHS.length - 1
+          ? <col key={i} style={{ width: `${w}px` }} />
+          : <col key={i} style={{ minWidth: `${w}px` }} />
+      )}
     </colgroup>
   );
 }
 
 const PLANNING_TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: "100%", borderCollapse: "collapse" };
-const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
+const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: "100%", minWidth: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
 
 export function PlanningTable({ initialRows, showMonths = true, serviceOrders = [], soByPlanningId, onSoLink }: PlanningTableProps) {
   const [searchOpen, setSearchOpen]   = useState(false);
