@@ -51,9 +51,15 @@ function EditText({
   return (
     <button
       onClick={() => { setDraft(value ?? ""); setEditing(true); }}
-      className={`w-full text-left text-xs ${value ? "text-gray-700" : "text-gray-400"} ${className ?? ""} hover:underline decoration-dashed underline-offset-2`}
+      className={`text-left text-xs group/cell ${className ?? ""}`}
     >
-      {value ?? (placeholder ?? "—")}
+      {value ? (
+        <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 group-hover/cell:bg-gray-200 transition-colors">
+          {value}
+        </span>
+      ) : (
+        <span className="text-gray-400">{placeholder ?? "—"}</span>
+      )}
     </button>
   );
 }
@@ -105,8 +111,8 @@ export function ServiceOrdersTable({
   };
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-gray-200 bg-white shadow-sm">
-      <table className="w-full text-sm" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
+    <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+      <table className="w-full text-xs" style={{ tableLayout: "fixed", borderCollapse: "collapse" }}>
         <colgroup>
           <col style={{ width: "120px" }} />
           <col style={{ width: "280px" }} />
@@ -114,23 +120,23 @@ export function ServiceOrdersTable({
           <col style={{ width: "32px" }} />
         </colgroup>
         <thead>
-          <tr className="bg-[#202022] text-gray-300 text-xs">
-            <th className="px-4 py-3 text-left font-medium">SO #</th>
-            <th className="px-4 py-3 text-left font-medium">Name</th>
-            <th className="px-4 py-3 text-left font-medium">Project / Deal</th>
-            <th className="px-2 py-3" />
+          <tr className="bg-[#202022] text-gray-400 text-[11px] tracking-wide uppercase select-none">
+            <th className="px-4 py-2.5 text-left font-medium">SO #</th>
+            <th className="px-4 py-2.5 text-left font-medium">Name</th>
+            <th className="px-4 py-2.5 text-left font-medium">Project / Deal</th>
+            <th className="px-2 py-2.5" />
           </tr>
         </thead>
         <tbody>
           {serviceOrders.length === 0 && !creating && (
             <tr>
               <td colSpan={4} className="px-4 py-10 text-center text-xs text-gray-400">
-                No service orders yet — click &ldquo;New service order&rdquo; to add one.
+                No service orders yet — click &ldquo;New service order&rdquo; below to add one.
               </td>
             </tr>
           )}
           {serviceOrders.map((so) => (
-            <tr key={so.id} className="border-t border-gray-100 hover:bg-gray-50/50 group">
+            <tr key={so.id} className="border-b border-gray-100 bg-white hover:brightness-[0.97] transition-all group">
               <td className="px-4 py-2">
                 <EditText
                   value={so.serviceOrderNo}
@@ -166,7 +172,7 @@ export function ServiceOrdersTable({
           ))}
 
           {creating && (
-            <tr className="border-t border-gray-100 bg-orange-50/40">
+            <tr className="border-b border-gray-100 bg-orange-50/50">
               <td className="px-4 py-2">
                 <input
                   autoFocus

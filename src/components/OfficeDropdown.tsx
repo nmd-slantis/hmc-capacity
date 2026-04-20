@@ -14,14 +14,14 @@ interface OfficeDropdownProps {
   onSaved: (v: string | null) => void;
 }
 
-// Module-level cache — shared across all OfficeDropdown instances on the page.
-// Invalidated on any mutation so the next open re-fetches.
+// Shared across all instances — fetched once, updated in-place on mutations.
 let _cachedOptions: OfficeOption[] | null = null;
 
 export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<OfficeOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState("");
   const [adding, setAdding] = useState(false);
@@ -29,44 +29,42 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
   const [mounted, setMounted] = useState(false);
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
+    if (open) setTimeout(() => searchRef.current?.focus(), 0);
+  }, [open]);
+  useEffect(() => {
     if (editingId !== null) setTimeout(() => editInputRef.current?.focus(), 0);
   }, [editingId]);
-
-  const loadOptions = async () => {
-    if (_cachedOptions) {
-      setOptions(_cachedOptions);
-      return;
-    }
-    const res = await fetch("/api/offices");
-    if (res.ok) {
-      const data: OfficeOption[] = await res.json();
-      _cachedOptions = data;
-      setOptions(data);
-    }
-  };
 
   const openDropdown = async () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
-      setPanelPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 180) });
+      setPanelPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 200) });
     }
     if (_cachedOptions) {
       setOptions(_cachedOptions);
       setOpen(true);
       return;
     }
+    // Open immediately — load behind the panel
     setLoading(true);
-    await loadOptions();
-    setLoading(false);
     setOpen(true);
+    const res = await fetch("/api/offices");
+    if (res.ok) {
+      const data: OfficeOption[] = await res.json();
+      _cachedOptions = data;
+      setOptions(data);
+    }
+    setLoading(false);
   };
 
   const close = () => {
     setOpen(false);
+    setSearch("");
     setEditingId(null);
     setEditDraft("");
     setAdding(false);
@@ -98,7 +96,7 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
     });
     if (res.ok) {
       const updated = await res.json();
-      const next = options.map((o) => o.id === opt.id ? updated : o);
+      const next = options.map((o) => (o.id === opt.id ? updated : o));
       setOptions(next);
       _cachedOptions = next;
       if (value === opt.label) onSaved(updated.label);
@@ -134,83 +132,101 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
     setAddDraft("");
   };
 
+  const filtered = options.filter((o) =>
+    !search || o.label.toLowerCase().includes(search.toLowerCase())
+  );
+
   const panel = open && (
     <div
       style={{ position: "fixed", top: panelPos.top, left: panelPos.left, minWidth: panelPos.width, zIndex: 200 }}
-      className="bg-white rounded-xl shadow-xl border border-gray-200 py-1 overflow-hidden"
+      className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
     >
-      {loading ? (
-        <div className="px-3 py-2 text-xs text-gray-400">Loading…</div>
-      ) : (
-        <>
-          {value && (
-            <button
-              onClick={() => selectOption(null)}
-              className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50"
-            >
-              — Clear
-            </button>
-          )}
-          {options.length === 0 && !value && (
-            <div className="px-3 py-1.5 text-xs text-gray-400">No offices yet</div>
-          )}
-          {options.map((opt) => (
-            <div key={opt.id} className="flex items-center group hover:bg-gray-50">
-              {editingId === opt.id ? (
-                <div className="flex items-center gap-1 px-3 py-1.5 w-full">
-                  <input
-                    ref={editInputRef}
-                    value={editDraft}
-                    onChange={(e) => setEditDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") saveEdit(opt); if (e.key === "Escape") setEditingId(null); }}
-                    className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5 outline-none focus:border-[#FF7700] min-w-0"
-                  />
-                  <button onClick={() => saveEdit(opt)} className="text-[#FF7700] text-xs flex-shrink-0">✓</button>
-                  <button onClick={() => setEditingId(null)} className="text-gray-400 text-xs flex-shrink-0">✕</button>
-                </div>
-              ) : (
-                <>
-                  <button
-                    onClick={() => selectOption(opt.label)}
-                    className={`flex-1 text-left px-3 py-1.5 text-xs ${value === opt.label ? "text-[#FF7700] font-medium" : "text-gray-700"}`}
-                  >
-                    {value === opt.label && <span className="mr-1 text-[10px]">✓</span>}
-                    {opt.label}
-                  </button>
-                  <div className="flex items-center gap-0 pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => startEdit(opt)} className="text-gray-400 hover:text-gray-700 text-[10px] px-1 py-1">✎</button>
-                    <button onClick={() => deleteOption(opt)} className="text-gray-400 hover:text-rose-500 text-[10px] px-1 py-1">✕</button>
-                  </div>
-                </>
-              )}
-            </div>
-          ))}
+      {/* Search bar */}
+      <div className="p-2 border-b border-gray-100">
+        <input
+          ref={searchRef}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search offices…"
+          className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-[#FF7700]"
+        />
+      </div>
 
-          <div className="border-t border-gray-100 mt-0.5">
-            {adding ? (
-              <div className="flex items-center gap-1 px-3 py-1.5">
+      {/* Items */}
+      <div className="max-h-52 overflow-y-auto py-1">
+        {loading && (
+          <div className="px-3 py-2 text-xs text-gray-400">Loading…</div>
+        )}
+        {!loading && value && (
+          <button
+            onClick={() => selectOption(null)}
+            className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50"
+          >
+            — Clear
+          </button>
+        )}
+        {!loading && filtered.length === 0 && (
+          <div className="px-3 py-1.5 text-xs text-gray-400">
+            {options.length === 0 ? "No offices yet" : "No results"}
+          </div>
+        )}
+        {!loading && filtered.map((opt) => (
+          <div key={opt.id} className="flex items-center group hover:bg-gray-50">
+            {editingId === opt.id ? (
+              <div className="flex items-center gap-1 px-3 py-1.5 w-full">
                 <input
-                  value={addDraft}
-                  onChange={(e) => setAddDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") saveAdd(); if (e.key === "Escape") { setAdding(false); setAddDraft(""); } }}
-                  placeholder="New office…"
+                  ref={editInputRef}
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(opt); if (e.key === "Escape") setEditingId(null); }}
                   className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5 outline-none focus:border-[#FF7700] min-w-0"
-                  autoFocus
                 />
-                <button onClick={saveAdd} className="text-[#FF7700] text-xs flex-shrink-0">✓</button>
-                <button onClick={() => { setAdding(false); setAddDraft(""); }} className="text-gray-400 text-xs flex-shrink-0">✕</button>
+                <button onClick={() => saveEdit(opt)} className="text-[#FF7700] text-xs flex-shrink-0">✓</button>
+                <button onClick={() => setEditingId(null)} className="text-gray-400 text-xs flex-shrink-0">✕</button>
               </div>
             ) : (
-              <button
-                onClick={() => { setAdding(true); setEditingId(null); }}
-                className="w-full text-left px-3 py-1.5 text-xs text-[#FF7700] hover:bg-orange-50 flex items-center gap-1"
-              >
-                <span className="text-base leading-none">+</span> Add office
-              </button>
+              <>
+                <button
+                  onClick={() => selectOption(opt.label)}
+                  className={`flex-1 text-left px-3 py-1.5 text-xs flex items-center gap-2 ${value === opt.label ? "text-[#FF7700]" : "text-gray-700"}`}
+                >
+                  <span className="w-3 flex-shrink-0 text-[10px]">{value === opt.label ? "✓" : ""}</span>
+                  {opt.label}
+                </button>
+                <div className="flex items-center pr-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => startEdit(opt)} className="text-gray-400 hover:text-gray-700 text-[10px] px-1 py-1">✎</button>
+                  <button onClick={() => deleteOption(opt)} className="text-gray-400 hover:text-rose-500 text-[10px] px-1 py-1">✕</button>
+                </div>
+              </>
             )}
           </div>
-        </>
-      )}
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-100">
+        {adding ? (
+          <div className="flex items-center gap-1 px-3 py-1.5">
+            <input
+              value={addDraft}
+              onChange={(e) => setAddDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveAdd(); if (e.key === "Escape") { setAdding(false); setAddDraft(""); } }}
+              placeholder="New office…"
+              className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-0.5 outline-none focus:border-[#FF7700] min-w-0"
+              autoFocus
+            />
+            <button onClick={saveAdd} className="text-[#FF7700] text-xs flex-shrink-0">✓</button>
+            <button onClick={() => { setAdding(false); setAddDraft(""); }} className="text-gray-400 text-xs flex-shrink-0">✕</button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setAdding(true); setEditingId(null); }}
+            className="w-full text-left px-3 py-1.5 text-xs text-[#FF7700] hover:bg-orange-50 flex items-center gap-1 transition-colors"
+          >
+            <span className="text-base leading-none">+</span> Add office
+          </button>
+        )}
+      </div>
     </div>
   );
 
