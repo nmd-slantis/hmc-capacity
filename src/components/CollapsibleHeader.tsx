@@ -46,7 +46,6 @@ export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, 
         <div className="flex items-center gap-4 text-xs text-gray-400">
           <span className="hidden sm:block">{today}</span>
           <span className="hidden md:block">{email}</span>
-          <span className="text-gray-500">{rowCount} project{rowCount !== 1 ? "s" : ""} · Odoo + HubSpot</span>
           <form action={signOut}>
             <button type="submit" className="text-gray-400 hover:text-white transition-colors">
               Sign out
