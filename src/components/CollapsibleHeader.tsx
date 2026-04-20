@@ -26,7 +26,7 @@ export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, 
 
           {onTabChange && (
             <div className="flex items-center gap-1 ml-2">
-              {(["planning", "admin"] as ActiveTab[]).map((tab) => (
+              {(["planning", "admin", "service-orders"] as ActiveTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => onTabChange(tab)}
@@ -36,7 +36,7 @@ export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, 
                       : "text-[#FF7700] border-[#FF7700]/40 hover:bg-[#FF7700]/10"
                   }`}
                 >
-                  {tab === "planning" ? "Planning" : "Administration"}
+                  {tab === "planning" ? "Planning" : tab === "admin" ? "Administration" : "Service Orders"}
                 </button>
               ))}
             </div>

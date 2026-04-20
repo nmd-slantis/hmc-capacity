@@ -5,12 +5,16 @@ import { createPortal } from "react-dom";
 import { EditableCell } from "./EditableCell";
 import { OfficeDropdown } from "./OfficeDropdown";
 import { FileUploadCell } from "./FileUploadCell";
+import { SoRelationCell } from "./SoRelationCell";
 import { VISIBLE_MONTHS, hoursToFte, distributeHours } from "@/config/months";
-import type { PlanningRow } from "@/types/planning";
+import type { PlanningRow, ServiceOrder } from "@/types/planning";
 
 interface ProjectRowProps {
   initialRow: PlanningRow;
   showMonths?: boolean;
+  serviceOrders?: ServiceOrder[];
+  linkedSos?: ServiceOrder[];
+  onSoLink?: (newSoId: string | null, oldSoId: string | null) => void;
 }
 
 const GROUP_ROW_CLASS: Record<string, string> = {
@@ -56,7 +60,7 @@ function HubSpotMark() {
   );
 }
 
-export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
+export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], linkedSos = [], onSoLink }: ProjectRowProps) {
   const [row, setRow] = useState<PlanningRow>(initialRow);
 
   const updateField = <K extends keyof PlanningRow>(key: K, value: PlanningRow[K]) =>
@@ -141,15 +145,12 @@ export function ProjectRow({ initialRow, showMonths = true }: ProjectRowProps) {
       {/* Admin-only: SO # and Confirmation (between SO and Comments) */}
       {!showMonths && (
         <>
-          <td className="px-2 py-1">
-            <EditableCell
-              rowId={row.id}
-              field="serviceOrderNo"
-              value={row.serviceOrderNo}
-              type="number"
-              onSaved={(v) => updateField("serviceOrderNo", v != null ? String(v) : null)}
-              className="text-gray-700 text-xs text-right"
-              placeholder="—"
+          <td className="px-2 py-1 border-l border-gray-200">
+            <SoRelationCell
+              planningId={row.id}
+              serviceOrders={serviceOrders}
+              linkedSoId={linkedSos[0]?.id ?? null}
+              onLink={(newSoId, oldSoId) => onSoLink?.(newSoId, oldSoId)}
             />
           </td>
           <td className="px-2 py-1">

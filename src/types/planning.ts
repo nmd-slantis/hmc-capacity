@@ -1,3 +1,12 @@
+export interface ServiceOrder {
+  id: string;
+  serviceOrderNo: string | null;
+  name: string;
+  projectIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type RowSource = "odoo" | "hubspot";
 
 export type RowStatus = "ongoing" | "done" | "todo" | "undated";

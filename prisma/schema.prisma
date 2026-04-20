@@ -36,6 +36,25 @@ model OfficeOption {
   createdAt DateTime @default(now())
 }
 
+// ─── Service Orders ──────────────────────────────────────────────────────────
+
+model ServiceOrder {
+  id             String                @id @default(cuid())
+  serviceOrderNo String?
+  name           String                @default("")
+  projects       ServiceOrderProject[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+}
+
+model ServiceOrderProject {
+  serviceOrderId String
+  planningId     String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id], onDelete: Cascade)
+
+  @@id([serviceOrderId, planningId])
+}
+
 // ─── Auth / User management (NextAuth v5 + PrismaAdapter) ───────────────────
 
 model User {

@@ -14,6 +14,10 @@ interface OfficeDropdownProps {
   onSaved: (v: string | null) => void;
 }
 
+// Module-level cache — shared across all OfficeDropdown instances on the page.
+// Invalidated on any mutation so the next open re-fetches.
+let _cachedOptions: OfficeOption[] | null = null;
+
 export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<OfficeOption[]>([]);
@@ -33,14 +37,27 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
   }, [editingId]);
 
   const loadOptions = async () => {
+    if (_cachedOptions) {
+      setOptions(_cachedOptions);
+      return;
+    }
     const res = await fetch("/api/offices");
-    if (res.ok) setOptions(await res.json());
+    if (res.ok) {
+      const data: OfficeOption[] = await res.json();
+      _cachedOptions = data;
+      setOptions(data);
+    }
   };
 
   const openDropdown = async () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
       setPanelPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 180) });
+    }
+    if (_cachedOptions) {
+      setOptions(_cachedOptions);
+      setOpen(true);
+      return;
     }
     setLoading(true);
     await loadOptions();
@@ -57,7 +74,7 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
   };
 
   const selectOption = async (label: string | null) => {
-    onSaved(label); // optimistic
+    onSaved(label);
     close();
     await fetch(`/api/planning/${rowId}`, {
       method: "PATCH",
@@ -81,7 +98,9 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
     });
     if (res.ok) {
       const updated = await res.json();
-      setOptions((prev) => prev.map((o) => o.id === opt.id ? updated : o));
+      const next = options.map((o) => o.id === opt.id ? updated : o);
+      setOptions(next);
+      _cachedOptions = next;
       if (value === opt.label) onSaved(updated.label);
     }
     setEditingId(null);
@@ -91,7 +110,9 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
   const deleteOption = async (opt: OfficeOption) => {
     const res = await fetch(`/api/offices/${opt.id}`, { method: "DELETE" });
     if (res.ok) {
-      setOptions((prev) => prev.filter((o) => o.id !== opt.id));
+      const next = options.filter((o) => o.id !== opt.id);
+      setOptions(next);
+      _cachedOptions = next;
       if (value === opt.label) onSaved(null);
     }
   };
@@ -105,7 +126,9 @@ export function OfficeDropdown({ rowId, value, onSaved }: OfficeDropdownProps) {
     });
     if (res.ok) {
       const created = await res.json();
-      setOptions((prev) => [...prev, created].sort((a, b) => a.label.localeCompare(b.label)));
+      const next = [...options, created].sort((a, b) => a.label.localeCompare(b.label));
+      setOptions(next);
+      _cachedOptions = next;
     }
     setAdding(false);
     setAddDraft("");

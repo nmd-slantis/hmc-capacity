@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { VISIBLE_MONTHS, hoursToFte, distributeHours } from "@/config/months";
 import { ProjectRow } from "./ProjectRow";
-import type { PlanningRow } from "@/types/planning";
+import type { PlanningRow, ServiceOrder } from "@/types/planning";
 
 function SearchIcon() {
   return (
@@ -16,6 +16,9 @@ function SearchIcon() {
 interface PlanningTableProps {
   initialRows: PlanningRow[];
   showMonths?: boolean;
+  serviceOrders?: ServiceOrder[];
+  soByPlanningId?: Map<string, ServiceOrder[]>;
+  onSoLink?: (planningId: string, newSoId: string | null, oldSoId: string | null) => void;
 }
 
 const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
@@ -61,7 +64,7 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
 const PLANNING_TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: "100%", borderCollapse: "collapse" };
 const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
 
-export function PlanningTable({ initialRows, showMonths = true }: PlanningTableProps) {
+export function PlanningTable({ initialRows, showMonths = true, serviceOrders = [], soByPlanningId, onSoLink }: PlanningTableProps) {
   const [searchOpen, setSearchOpen]   = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -388,7 +391,14 @@ export function PlanningTable({ initialRows, showMonths = true }: PlanningTableP
                     {/* Always rendered — CSS hidden preserves local edit state when collapsed */}
                     <tbody className={isCollapsed ? "hidden" : ""}>
                       {rows.map((row) => (
-                        <ProjectRow key={row.id} initialRow={row} showMonths={showMonths} />
+                        <ProjectRow
+                          key={row.id}
+                          initialRow={row}
+                          showMonths={showMonths}
+                          serviceOrders={serviceOrders}
+                          linkedSos={soByPlanningId?.get(row.id) ?? []}
+                          onSoLink={(newSoId, oldSoId) => onSoLink?.(row.id, newSoId, oldSoId)}
+                        />
                       ))}
                     </tbody>
                   </table>

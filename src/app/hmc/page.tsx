@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { buildPlanningRows } from "@/lib/planning";
+import { prisma } from "@/lib/prisma";
 import { HmcClientLayout } from "@/components/HmcClientLayout";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +10,19 @@ export default async function HmcPage() {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const rows = await buildPlanningRows();
+  const [rows, soData] = await Promise.all([
+    buildPlanningRows(),
+    prisma.serviceOrder.findMany({ include: { projects: true }, orderBy: { createdAt: "asc" } }),
+  ]);
+
+  const serviceOrders = soData.map((so) => ({
+    id: so.id,
+    serviceOrderNo: so.serviceOrderNo,
+    name: so.name,
+    projectIds: so.projects.map((p) => p.planningId),
+    createdAt: so.createdAt.toISOString(),
+    updatedAt: so.updatedAt.toISOString(),
+  }));
 
   const today = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -26,6 +39,7 @@ export default async function HmcPage() {
     <div className="min-h-screen bg-[#f5f5f5]">
       <HmcClientLayout
         initialRows={rows}
+        initialServiceOrders={serviceOrders}
         email={session.user?.email}
         today={today}
         rowCount={rows.length}

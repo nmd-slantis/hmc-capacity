@@ -1,0 +1,49 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+export async function GET() {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const sos = await prisma.serviceOrder.findMany({
+    include: { projects: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return NextResponse.json(
+    sos.map((so) => ({
+      id: so.id,
+      serviceOrderNo: so.serviceOrderNo,
+      name: so.name,
+      projectIds: so.projects.map((p) => p.planningId),
+      createdAt: so.createdAt.toISOString(),
+      updatedAt: so.updatedAt.toISOString(),
+    }))
+  );
+}
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { serviceOrderNo, name } = await req.json();
+  const so = await prisma.serviceOrder.create({
+    data: { serviceOrderNo: serviceOrderNo || null, name: name || "" },
+    include: { projects: true },
+  });
+
+  return NextResponse.json(
+    {
+      id: so.id,
+      serviceOrderNo: so.serviceOrderNo,
+      name: so.name,
+      projectIds: [],
+      createdAt: so.createdAt.toISOString(),
+      updatedAt: so.updatedAt.toISOString(),
+    },
+    { status: 201 }
+  );
+}
