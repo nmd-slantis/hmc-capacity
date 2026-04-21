@@ -9,7 +9,7 @@ const HS_CLOSED_LOST_STAGE = "closedlost";
 
 function hsGroup(pipeline: string | null, stage: string | null): string {
   if (pipeline === HS_SERVICE_PIPELINE) return "Service Pipeline";
-  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Closed Won";
+  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Service Pipeline"; // merged with Service Pipeline
   if (stage === HS_CLOSED_LOST_STAGE) return "Closed Lost";
   return "Sales Pipeline";
 }
@@ -126,14 +126,16 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       const projDates = soData ? getSoProjectDates(soData) : { startDate: null, endDate: null };
 
       // Canonical dates: SO+projects → project dates; SO only → SO date_order / null; no SO → HS project dates / null
+      const hsStartDate = parseHsDate(d.properties.project_start_date);
+      const hsEndDate   = parseHsDate(d.properties.project_end_date);
       const canonicalStart: Date | null = soData
         ? (projDates.startDate ?? (soData.date_order
             ? new Date(String(soData.date_order).substring(0, 10))
             : null))
-        : parseHsDate(d.properties.project_start_date);
+        : (isValidDate(hsStartDate) ? hsStartDate : null);
       const canonicalEnd: Date | null = soData
         ? (projDates.endDate ?? null)
-        : parseHsDate(d.properties.project_end_date);
+        : (isValidDate(hsEndDate) ? hsEndDate : null);
 
       const storedStartStr   = isValidDate(existing?.startDate) ? dateToIso(existing.startDate) : null;
       const storedEndStr     = isValidDate(existing?.endDate)   ? dateToIso(existing.endDate)   : null;
@@ -186,15 +188,17 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     const manual = manualMap.get(id);
     const soData = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
     const projDates = soData ? getSoProjectDates(soData) : { startDate: null, endDate: null };
-    // Live dates from Odoo/HubSpot sources
+    // Live dates from Odoo/HubSpot sources (guard against near-epoch timestamps from HubSpot)
+    const hsStartRaw = parseHsDate(d.properties.project_start_date);
+    const hsEndRaw   = parseHsDate(d.properties.project_end_date);
     const liveStartDate: string | null = soData
       ? (projDates.startDate
           ? dateToIso(projDates.startDate)
           : (soData.date_order ? String(soData.date_order).substring(0, 10) : null))
-      : dateToIso(parseHsDate(d.properties.project_start_date));
+      : (isValidDate(hsStartRaw) ? dateToIso(hsStartRaw) : null);
     const liveEndDate: string | null = soData
       ? dateToIso(projDates.endDate)
-      : dateToIso(parseHsDate(d.properties.project_end_date));
+      : (isValidDate(hsEndRaw) ? dateToIso(hsEndRaw) : null);
 
     // Live soldHrs from Odoo SO
     const rawHrs = soData?.x_studio_sold_hours;
@@ -216,7 +220,9 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     const hsPipeline = d.properties.pipeline ?? null;
     const hsStage = d.properties.dealstage ?? null;
     const hsStageLabel = hsStage ? (stageLabels.get(hsStage) ?? null) : null;
-    const hsStageOrder = hsStage != null ? (stageOrders.get(hsStage) ?? null) : null;
+    // Closed Won stages forced to -1 so they appear first in Service Pipeline gradient
+    const isClosedWon = HS_CLOSED_WON_STAGES.has(hsStage ?? "");
+    const hsStageOrder = isClosedWon ? -1 : (hsStage != null ? (stageOrders.get(hsStage) ?? null) : null);
 
     rows.push({
       id,

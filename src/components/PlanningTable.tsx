@@ -189,7 +189,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const ACTIVE_HIDDEN_LABELS = ["Project Closure", "Project Canceled", "Project Cancelled"];
   const afterActiveFilter = activeOnly
     ? initialRows.filter((r) => {
-        if ((r.group === "Closed Won" || r.group === "Closed Lost") && !r.so) return false;
+        if (r.group === "Closed Lost" && !r.so) return false;
         if (r.hsStageLabel && ACTIVE_HIDDEN_LABELS.includes(r.hsStageLabel)) return false;
         if (r.hsStage !== "988280923") return true;
         const end = r.endDate ? new Date(r.endDate) : null;
