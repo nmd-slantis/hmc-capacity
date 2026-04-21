@@ -166,12 +166,14 @@ function EditableDateCell({
   rowId,
   field,
   value,
+  liveDate,
   isManual,
   onSaved,
 }: {
   rowId: string;
   field: "startDate" | "endDate";
   value: string | null;
+  liveDate: string | null;
   isManual: boolean;
   onSaved: (v: string | null, manual: boolean) => void;
 }) {
@@ -206,8 +208,7 @@ function EditableDateCell({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [field]: null, [`${field}Manual`]: false }),
     });
-    // Reload so the server re-seeds the live date
-    window.location.reload();
+    onSaved(liveDate, false);
   };
 
   if (editing) {
@@ -318,6 +319,7 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
           rowId={row.id}
           field="startDate"
           value={row.startDate}
+          liveDate={row.startDateLive}
           isManual={row.startDateManual}
           onSaved={(v, manual) => setRow((prev) => ({ ...prev, startDate: v, startDateManual: manual }))}
         />
@@ -327,6 +329,7 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
           rowId={row.id}
           field="endDate"
           value={row.endDate}
+          liveDate={row.endDateLive}
           isManual={row.endDateManual}
           onSaved={(v, manual) => setRow((prev) => ({ ...prev, endDate: v, endDateManual: manual }))}
         />

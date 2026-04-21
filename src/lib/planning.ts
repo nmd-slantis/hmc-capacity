@@ -212,6 +212,8 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       name: d.properties.dealname,
       startDate,
       endDate,
+      startDateLive: liveStartDate,
+      endDateLive: liveEndDate,
       startDateManual: manual?.startDateManual ?? false,
       endDateManual: manual?.endDateManual ?? false,
       effort: manual?.effort ?? null,

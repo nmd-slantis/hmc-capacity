@@ -26,9 +26,11 @@ export interface PlanningRow {
   id: string;              // "odoo-{id}" or "hubspot-{id}"
   source: RowSource;
   name: string;
-  startDate: string | null;   // ISO date string (serialized for RSC→client)
-  endDate: string | null;     // ISO date string
-  startDateManual: boolean;   // true = user-edited, breaks live Odoo sync
+  startDate: string | null;     // ISO date string (serialized for RSC→client)
+  endDate: string | null;       // ISO date string
+  startDateLive: string | null; // live date from Odoo/HubSpot, never overridden
+  endDateLive: string | null;
+  startDateManual: boolean;     // true = user-edited, breaks live Odoo sync
   endDateManual: boolean;
   effort: number | null;
   soldHrs: number | null;
