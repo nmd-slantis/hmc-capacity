@@ -166,6 +166,9 @@ export function ServiceOrdersTable({
   const [newSoNo, setNewSoNo] = useState("");
   const [newName, setNewName] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [filters, setFilters] = useState({ soNo: "", name: "", project: "" });
+  const sf = (k: keyof typeof filters) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFilters((p) => ({ ...p, [k]: e.target.value }));
 
   const nextSoNoPlaceholder = useMemo(() => {
     const nums = serviceOrders
@@ -232,6 +235,22 @@ export function ServiceOrdersTable({
             </th>
             <th className="px-4 py-2.5 text-left font-medium">Project / Deal</th>
           </tr>
+          <tr className="bg-[#111113]" style={{ height: "28px" }}>
+            <th className="px-1 py-0.5" />
+            <th className="px-2 py-0.5">
+              <input value={filters.soNo} onChange={sf("soNo")} placeholder="SO#…"
+                className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+            </th>
+            <th className="px-2 py-0.5">
+              <input value={filters.name} onChange={sf("name")} placeholder="Name…"
+                className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+            </th>
+            <th className="px-1 py-0.5" />
+            <th className="px-2 py-0.5">
+              <input value={filters.project} onChange={sf("project")} placeholder="Project…"
+                className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+            </th>
+          </tr>
         </thead>
         <tbody>
           {serviceOrders.length === 0 && !creating && (
@@ -241,7 +260,15 @@ export function ServiceOrdersTable({
               </td>
             </tr>
           )}
-          {serviceOrders.map((so) => (
+          {serviceOrders.filter((so) => {
+            const q1 = filters.soNo.trim().toLowerCase();
+            const q2 = filters.name.trim().toLowerCase();
+            const q3 = filters.project.trim().toLowerCase();
+            if (q1 && !(so.serviceOrderNo ?? "").toLowerCase().includes(q1)) return false;
+            if (q2 && !so.name.toLowerCase().includes(q2)) return false;
+            if (q3 && !so.projectIds.some((pid) => planningRows.find((r) => r.id === pid)?.name.toLowerCase().includes(q3))) return false;
+            return true;
+          }).map((so) => (
             <tr key={so.id} className="border-b border-gray-100 bg-white hover:brightness-[0.97] transition-all group">
               <td className="px-2 py-2 text-center">
                 <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

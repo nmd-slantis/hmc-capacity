@@ -151,7 +151,13 @@ function OfficeRelationCell({ rowId, offices, value, onSaved }: {
     <>
       <button ref={triggerRef} onClick={open ? close : openPanel}
         className="w-full flex items-center gap-1 text-xs text-left group">
-        <span className={`flex-1 truncate ${value ? "text-gray-700" : "text-gray-400"}`}>{value ?? "—"}</span>
+        {value ? (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 text-[10px] font-medium truncate max-w-full">
+            {value}
+          </span>
+        ) : (
+          <span className="flex-1 text-gray-400">—</span>
+        )}
         <span className="text-gray-400 flex-shrink-0 text-[10px] group-hover:text-gray-600">▾</span>
       </button>
       {mounted && createPortal(
@@ -513,6 +519,8 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
           </React.Fragment>
         );
       })}
+      {/* Scrollbar gutter — absorbs header/body width diff when vertical scroll appears */}
+      <td className="p-0" />
     </tr>
   );
 }

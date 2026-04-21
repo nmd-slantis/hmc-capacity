@@ -84,6 +84,9 @@ function LinkedProjectsCell({ officeLabelOrNew, planningRows }: { officeLabelOrN
 }
 
 export function OfficesTable({ offices, planningRows, onUpdate, onCreate, onDelete }: OfficesTableProps) {
+  const [filters, setFilters] = useState({ label: "", address: "", contact: "", email: "", notes: "" });
+  const sf = (k: keyof typeof filters) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setFilters((p) => ({ ...p, [k]: e.target.value }));
   const [creating, setCreating] = useState(false);
   const [newLabel, setNewLabel] = useState("");
   const [newAddress, setNewAddress] = useState("");
@@ -150,6 +153,16 @@ export function OfficesTable({ offices, planningRows, onUpdate, onCreate, onDele
             <th className="px-4 py-2.5 text-left font-medium">Notes</th>
             <th className="px-4 py-2.5 text-left font-medium">Projects / Deals</th>
           </tr>
+          <tr className="bg-[#111113]" style={{ height: "28px" }}>
+            <th className="px-1 py-0.5" />
+            {(["label","address","contact","email","notes"] as const).map((k) => (
+              <th key={k} className="px-2 py-0.5">
+                <input value={filters[k]} onChange={sf(k)} placeholder="…"
+                  className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+              </th>
+            ))}
+            <th className="px-1 py-0.5" />
+          </tr>
         </thead>
         <tbody>
           {offices.length === 0 && !creating && (
@@ -159,7 +172,10 @@ export function OfficesTable({ offices, planningRows, onUpdate, onCreate, onDele
               </td>
             </tr>
           )}
-          {offices.map((office) => (
+          {offices.filter((o) => {
+            const q = (k: string, v: string | null) => !k || (v ?? "").toLowerCase().includes(k.toLowerCase());
+            return q(filters.label, o.label) && q(filters.address, o.address) && q(filters.contact, o.contactName) && q(filters.email, o.contactEmail) && q(filters.notes, o.notes);
+          }).map((office) => (
             <tr key={office.id} className="border-b border-gray-100 bg-white hover:brightness-[0.97] transition-all group">
               <td className="px-2 py-2 text-center">
                 <button

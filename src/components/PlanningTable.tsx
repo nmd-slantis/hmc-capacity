@@ -5,13 +5,6 @@ import { VISIBLE_MONTHS, hoursToFte, distributeHours } from "@/config/months";
 import { ProjectRow } from "./ProjectRow";
 import type { PlanningRow, ServiceOrder, Office } from "@/types/planning";
 
-function SearchIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-      <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clipRule="evenodd" />
-    </svg>
-  );
-}
 
 interface PlanningTableProps {
   initialRows: PlanningRow[];
@@ -52,6 +45,7 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
             <col style={{ width: "40px" }} />
           </React.Fragment>
         ))}
+        <col style={{ width: "16px" }} />{/* scrollbar gutter */}
       </colgroup>
     );
   }
@@ -63,6 +57,7 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
           ? <col key={i} />
           : <col key={i} style={{ width: `${w}px` }} />
       )}
+      <col style={{ width: "16px" }} />{/* scrollbar gutter */}
     </colgroup>
   );
 }
@@ -71,9 +66,9 @@ const PLANNING_TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width:
 const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: "100%", minWidth: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
 
 export function PlanningTable({ initialRows, showMonths = true, serviceOrders = [], offices = [], soByPlanningId, onSoLink }: PlanningTableProps) {
-  const [searchOpen, setSearchOpen]   = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [colFilters, setColFilters] = useState<Record<string, string>>({});
+  const setFilter = (key: string, val: string) => setColFilters((prev) => ({ ...prev, [key]: val }));
+  const gf = (key: string) => colFilters[key] ?? "";
   const [activeOnly, setActiveOnly] = useState(true);
   const [sortKey, setSortKey]   = useState<string | null>(null);
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
@@ -126,8 +121,6 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const bodyScrollRef   = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { if (searchOpen) searchRef.current?.focus(); }, [searchOpen]);
-
   useEffect(() => {
     const body   = bodyScrollRef.current;
     const header = headerScrollRef.current;
@@ -137,7 +130,11 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
     return () => body.removeEventListener("scroll", sync);
   }, []);
 
-  const closeSearch = () => { setSearchOpen(false); setSearchQuery(""); };
+  const fmtDate = (iso: string | null) => {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    return `${m}/${d}/${y}`;
+  };
 
   if (initialRows.length === 0) {
     return (
@@ -159,11 +156,28 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
       })
     : initialRows;
 
-  const filtered = searchQuery.trim()
-    ? afterActiveFilter.filter((r) =>
-        r.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
-      )
-    : afterActiveFilter;
+  const filtered = Object.entries(colFilters).reduce((rows, [key, val]) => {
+    const q = val.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      switch (key) {
+        case "name":      return r.name.toLowerCase().includes(q);
+        case "startDate": return fmtDate(r.startDate).includes(q);
+        case "endDate":   return fmtDate(r.endDate).includes(q);
+        case "soldHrs":   return String(r.soldHrs ?? "").includes(q);
+        case "so":        return (r.so ?? "").toLowerCase().includes(q);
+        case "comments":  return (r.comments ?? "").toLowerCase().includes(q);
+        case "approved":  return q.startsWith("y") ? r.approved : q.startsWith("n") ? !r.approved : true;
+        case "stage":     return (r.hsStageLabel ?? "").toLowerCase().includes(q);
+        case "soNo": {
+          const linked = soByPlanningId?.get(r.id) ?? [];
+          return linked.some((so) => (so.serviceOrderNo ?? "").toLowerCase().includes(q) || so.name.toLowerCase().includes(q));
+        }
+        case "office":    return (r.office ?? "").toLowerCase().includes(q);
+        default:          return true;
+      }
+    });
+  }, afterActiveFilter);
 
   const rawGroups: { label: string; rows: PlanningRow[] }[] = [];
   for (const row of filtered) {
@@ -210,47 +224,28 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                       </div>
                     </th>
                   ))}
+                  <th className="p-0" />{/* gutter */}
                 </tr>
               )}
 
-              {/* Row 2 — sub-headers (same height in both Planning and Admin) */}
+              {/* Row 2 — sub-headers */}
               <tr className="bg-[#2e2e30] text-gray-300 text-[10px] uppercase tracking-wider" style={{ height: "36px" }}>
                 <th className="sticky left-0 z-[1] bg-[#2e2e30] px-3 py-1 border-r-2 border-gray-600">
-                  {searchOpen ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        ref={searchRef}
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={(e) => e.key === "Escape" && closeSearch()}
-                        placeholder="Search…"
-                        className="flex-1 bg-[#3a3a3c] text-white text-[10px] px-2 py-0.5 rounded border border-gray-500 focus:border-[#FF7700] outline-none placeholder-gray-500 min-w-0"
-                      />
-                      <button onClick={closeSearch} className="text-gray-400 hover:text-white flex-shrink-0 leading-none" aria-label="Close search">✕</button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-between gap-1">
-                      <button onClick={() => handleSort("name")}
-                        className={`text-[10px] uppercase tracking-wider hover:text-white transition-colors inline-flex items-center gap-1 ${sortKey === "name" ? "text-[#FF7700]" : ""}`}>
-                        Project / Deal {sortIndicator("name")}
-                      </button>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => setActiveOnly((v) => !v)}
-                          className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
-                            activeOnly ? "bg-[#FF7700] text-white" : "bg-gray-700 text-gray-400 hover:text-white"
-                          }`}
-                        >
-                          <span className={`w-1 h-1 rounded-full flex-shrink-0 ${activeOnly ? "bg-white" : "bg-gray-500"}`} />
-                          Active
-                        </button>
-                        <button onClick={() => setSearchOpen(true)} className="text-gray-500 hover:text-white transition-colors" aria-label="Search projects">
-                          <SearchIcon />
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-center justify-between gap-1">
+                    <button onClick={() => handleSort("name")}
+                      className={`text-[10px] uppercase tracking-wider hover:text-white transition-colors inline-flex items-center gap-1 ${sortKey === "name" ? "text-[#FF7700]" : ""}`}>
+                      Project / Deal {sortIndicator("name")}
+                    </button>
+                    <button
+                      onClick={() => setActiveOnly((v) => !v)}
+                      className={`flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors flex-shrink-0 ${
+                        activeOnly ? "bg-[#FF7700] text-white" : "bg-gray-700 text-gray-400 hover:text-white"
+                      }`}
+                    >
+                      <span className={`w-1 h-1 rounded-full flex-shrink-0 ${activeOnly ? "bg-white" : "bg-gray-500"}`} />
+                      Active
+                    </button>
+                  </div>
                 </th>
 
                 {/* Admin-only: HS, Odoo icons + Stage */}
@@ -289,7 +284,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                   );
                 })}
 
-                {/* Admin-only: SO# and Confirmation (between SO and Comments) */}
+                {/* Admin-only: SO# and Confirmation */}
                 {!showMonths && (
                   <>
                     <th className="px-2 py-1.5 text-left border-l border-gray-700">SO #</th>
@@ -297,20 +292,18 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                   </>
                 )}
 
-                {/* Planning-only: Comments (in Details tab it moves to the end) */}
+                {/* Planning-only: Comments */}
                 {showMonths && <th className="px-2 py-1.5 text-left">Comments</th>}
 
                 {/* Both views: Approved */}
                 <th className="px-2 py-1.5 text-left">Approved?</th>
 
-                {/* Admin-only: Office */}
+                {/* Admin-only: Office, Comments */}
                 {!showMonths && (
-                  <th className="px-2 py-1.5 text-left border-l border-gray-700">Office</th>
-                )}
-
-                {/* Admin-only: Comments (at end in Details tab) */}
-                {!showMonths && (
-                  <th className="px-2 py-1.5 text-left border-l border-gray-700">Comments</th>
+                  <>
+                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Office</th>
+                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Comments</th>
+                  </>
                 )}
 
                 {/* Planning-only month sub-headers */}
@@ -329,6 +322,77 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                     <th className="px-1 py-1.5 text-left bg-gray-800/40">FTE</th>
                   </React.Fragment>
                 ))}
+                <th className="p-0" />{/* gutter */}
+              </tr>
+
+              {/* Row 3 — column filters */}
+              <tr className="bg-[#111113]" style={{ height: "28px" }}>
+                <th className="sticky left-0 z-[1] bg-[#111113] px-2 py-0.5 border-r-2 border-gray-800">
+                  <input value={gf("name")} onChange={(e) => setFilter("name", e.target.value)}
+                    placeholder="Filter…"
+                    className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                </th>
+                {!showMonths && (
+                  <>
+                    <th className="px-1 py-0.5" />{/* HS */}
+                    <th className="px-1 py-0.5" />{/* Odoo */}
+                    <th className="px-2 py-0.5">
+                      <input value={gf("stage")} onChange={(e) => setFilter("stage", e.target.value)}
+                        placeholder="Stage…"
+                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                    </th>
+                  </>
+                )}
+                {(["startDate","endDate","soldHrs","so"] as const).map((key) => (
+                  <th key={key} className="px-2 py-0.5">
+                    <input value={gf(key)} onChange={(e) => setFilter(key, e.target.value)}
+                      placeholder="…"
+                      className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                  </th>
+                ))}
+                {!showMonths && (
+                  <>
+                    <th className="px-2 py-0.5">
+                      <input value={gf("soNo")} onChange={(e) => setFilter("soNo", e.target.value)}
+                        placeholder="SO#…"
+                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                    </th>
+                    <th className="px-1 py-0.5" />{/* Confirmation */}
+                  </>
+                )}
+                {showMonths && (
+                  <th className="px-2 py-0.5">
+                    <input value={gf("comments")} onChange={(e) => setFilter("comments", e.target.value)}
+                      placeholder="…"
+                      className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                  </th>
+                )}
+                <th className="px-2 py-0.5">
+                  <input value={gf("approved")} onChange={(e) => setFilter("approved", e.target.value)}
+                    placeholder="y/n"
+                    className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                </th>
+                {!showMonths && (
+                  <>
+                    <th className="px-2 py-0.5">
+                      <input value={gf("office")} onChange={(e) => setFilter("office", e.target.value)}
+                        placeholder="Office…"
+                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                    </th>
+                    <th className="px-2 py-0.5">
+                      <input value={gf("comments")} onChange={(e) => setFilter("comments", e.target.value)}
+                        placeholder="…"
+                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                    </th>
+                  </>
+                )}
+                {showMonths && VISIBLE_MONTHS.map((m) => (
+                  <React.Fragment key={m.key}>
+                    <th className="px-1 py-0.5" />
+                    <th className="px-1 py-0.5" />
+                  </React.Fragment>
+                ))}
+                <th className="p-0" />{/* gutter */}
               </tr>
             </thead>
           </table>
@@ -340,7 +404,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
       <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
         <div
           ref={bodyScrollRef}
-          style={{ overflowX: "auto", overflowY: "auto", maxHeight: showMonths ? "calc(100vh - 260px)" : "calc(100vh - 220px)" }}
+          style={{ overflowX: "auto", overflowY: "auto", maxHeight: showMonths ? "calc(100vh - 292px)" : "calc(100vh - 252px)" }}
         >
           <div style={{ width: "100%", minWidth: TABLE_MIN_WIDTH, paddingBottom: "8px" }}>
 
@@ -393,6 +457,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                             </React.Fragment>
                           );
                         })}
+                        <td className="p-0" />{/* gutter */}
                       </tr>
                     </thead>
                     {/* Always rendered — CSS hidden preserves local edit state when collapsed */}

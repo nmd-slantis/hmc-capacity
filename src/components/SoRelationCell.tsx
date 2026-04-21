@@ -115,9 +115,13 @@ export function SoRelationCell({ planningId, serviceOrders, linkedSoId, onLink }
         onClick={open ? close : openPanel}
         className="w-full flex items-center gap-1 text-xs text-left group"
       >
-        <span className={`flex-1 truncate ${linkedSo ? "text-gray-700 font-medium" : "text-gray-400"}`}>
-          {displayLabel}
-        </span>
+        {linkedSo ? (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-medium truncate max-w-full">
+            {displayLabel}
+          </span>
+        ) : (
+          <span className="flex-1 text-gray-400">—</span>
+        )}
         <span className="text-gray-400 flex-shrink-0 text-[10px] group-hover:text-gray-600">▾</span>
       </button>
       {mounted && createPortal(
