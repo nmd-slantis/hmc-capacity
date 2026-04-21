@@ -10,10 +10,10 @@ const HS_CLOSED_LOST_STAGE = "closedlost";
 const PROJECT_CANCELED_LABELS = new Set(["Project Canceled", "Project Cancelled"]);
 
 function hsGroup(pipeline: string | null, stage: string | null, stageLabel?: string | null): string {
-  if (pipeline === HS_SERVICE_PIPELINE) return "Ongoing";
-  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Ongoing";
   if (stage === HS_CLOSED_LOST_STAGE) return "Canceled";
   if (stageLabel && PROJECT_CANCELED_LABELS.has(stageLabel)) return "Canceled";
+  if (pipeline === HS_SERVICE_PIPELINE) return "Ongoing";
+  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Ongoing";
   return "Opportunities";
 }
 

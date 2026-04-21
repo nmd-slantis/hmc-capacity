@@ -183,7 +183,8 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
     ? initialRows.filter((r) => {
         if (r.group === "Canceled" && !r.so) return false;
         if (r.hsStageLabel && ACTIVE_HIDDEN_LABELS.includes(r.hsStageLabel)) return false;
-        if (!r.so && r.endDate && new Date(r.endDate).getFullYear() <= 2025) return false;
+        const anchorDate = r.endDate || r.startDate;
+        if (!r.so && anchorDate && new Date(anchorDate).getFullYear() <= 2025) return false;
         return true;
       })
     : initialRows;
