@@ -18,11 +18,7 @@ Planning coordination tool between /slantis team and HMC Architects — merges O
 
 ## Open Tasks
 
-- [ ] **Turso migration** — run SQL to add new columns: `startDateManual`/`endDateManual` on ManualData; `address`/`contactName`/`contactEmail`/`notes` on OfficeOption; `docusignUrl` on ServiceOrder
-- [ ] Build user management admin UI (currently manual via Turso dashboard)
-- [ ] Month visibility toggle UI (currently `hidden: true` in `months.ts` only)
-- [ ] Pipeline totals row — per-month total Hrs/FTE across all groups
-- [ ] Move Comments column in Details tab as far right as possible (after Office)
+_(none)_
 
 ---
 
@@ -37,6 +33,17 @@ npm run dev            # → http://localhost:3000
 ---
 
 ## Session Log
+
+### 2026-04-21
+- Filter enhancements: numeric toggle (= / ≥ / ≤) on Effort Hrs + per-month Hrs columns; multi-word AND matching on all text filters (split on space); month Hrs filter inputs in Planning tab
+- Stage pills colored white → full group color by HubSpot `displayOrder`; gradient stable when filtering; removed static `HS_STAGE_COLORS` map
+- Group renames: Service Pipeline → Ongoing, Sales Pipeline → Opportunities, Closed Lost → Canceled
+- Closed Won deals merged into Ongoing; forced `hsStageOrder = -1` so they sort before Kick off Meeting in gradient
+- "Project Canceled/Cancelled" stage labels now route to Canceled group (fixed ordering bug in `hsGroup()`)
+- Active filter: hides deals ending 2025 or earlier without SO; uses end date falling back to start date; hides "Project Closure" stage label
+- Fixed 1970 date bug: `isValidDate` guard applied to HubSpot ms timestamps before using them for dates
+- Color picker for Offices and Service Orders: colored swatch column, native browser color input, saves on close; auto text contrast via luminance (`src/lib/color.ts`); chips in SoRelationCell and OfficeRelationCell use stored colors
+- Turso DDL migration: added `color TEXT` to `OfficeOption` and `ServiceOrder` tables
 
 ### 2026-04-20 (session 2)
 - Offices tab (4th): `OfficesTable.tsx` CRUD; `OfficeOption` schema + `address`/`contactName`/`contactEmail`/`notes`; API routes; `LinkedProjectsCell` shows linked planning rows
@@ -75,25 +82,18 @@ npm run dev            # → http://localhost:3000
 - Odoo rows: seed dates from linked project(s) via `project_ids` (min start / max end)
 - Fixed critical Odoo auth bug: cookie now extracted from Set-Cookie and forwarded via `Cookie` header on all call_kw requests
 - Fixed 2 TS build errors (Array.from for Map/Set iterators)
-- **In progress:** Odoo data still not loading in UI — auth works, call_kw throws unknown error; `/api/odoo/projects` now exposes full error (next session: visit URL, read error, fix)
 
 ### 2026-04-16 (session 2)
 - Group collapse/expand: all groups start collapsed; click header to toggle (▲/▼)
 - Frozen header: two-table layout — black header card static above scrollable body div; JS syncs horizontal scroll
 - Group cards: each group is a separate rounded card with colored header, bullet, name, count
-- "H" → "Hrs" in monthly sub-header columns
 - Effort Hrs: computed from sum of monthly hours (read-only); replaces manual Effort field
 - Sold Hrs: new editable column; auto-seeded once from Odoo SO `x_studio_sold_hours` (soSeeded flag)
 - Dates editable for all rows; Odoo rows seeded once from SO project start/end dates
-- Color dot on Effort Hrs: 🟢≤5% · 🟡≤15% · 🔴>15% deviation from Sold Hrs
 - Prisma schema: `soldHrs Float?` + `soSeeded Boolean @default(false)` added to ManualData
-- **Pending:** `prisma db push` to apply schema to Turso
 
 ### 2026-04-16 (session 1)
 - Registered project: memory file + registry entry created
 - Cloned repo from `nmd-slantis/hmc-capacity`
 - Documented full stack, env vars, file structure, DB schema, and open tasks
-- Reviewed Vercel deployment history (8 deploys, latest READY on `cb35e12`)
-- Confirmed only one branch exists (`claude/hmc-architects-home-page-wutmV`) — no `main`
-- App is built and working; blocked only by missing Vercel credentials (Odoo + HubSpot)
 - Planning/coordination session only — no code changes
