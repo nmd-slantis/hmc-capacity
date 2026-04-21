@@ -13,6 +13,8 @@ interface PlanningTableProps {
   offices?: Office[];
   soByPlanningId?: Map<string, ServiceOrder[]>;
   onSoLink?: (planningId: string, newSoId: string | null, oldSoId: string | null) => void;
+  onSoCreate?: (so: ServiceOrder) => void;
+  onOfficeCreate?: (office: Office) => void;
 }
 
 const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
@@ -22,12 +24,12 @@ const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
   "No Dates":      { header: "bg-gray-500 text-white",    bullet: "bg-gray-300"    },
 };
 
-// Planning: Name, Start, End, EffortHrs, SO, Comments, Approved (no HS/Odoo/DS)
-const PLANNING_BASE_WIDTHS = [300, 95, 95, 58, 75, 150, 80];
-const PLANNING_BASE_TOTAL  = PLANNING_BASE_WIDTHS.reduce((a, b) => a + b, 0); // 853
+// Pipeline: Name, Start, End, Hrs, SO, SO#, Office, Comments, Approved
+const PLANNING_BASE_WIDTHS = [300, 95, 95, 58, 75, 90, 120, 150, 80];
+const PLANNING_BASE_TOTAL  = PLANNING_BASE_WIDTHS.reduce((a, b) => a + b, 0);
 
-// Admin: Name, HS, Odoo, Stage, Start, End, EffortHrs, SO, SO#, Confirmation, Approved, Office, Comments
-const ADMIN_COL_WIDTHS = [300, 36, 36, 110, 95, 95, 58, 75, 80, 120, 80, 140, 150];
+// Admin: Name, HS, Odoo, Stage, Start, End, Hrs, SO, SO#, Office, Approved, Comments(flex), Filter?
+const ADMIN_COL_WIDTHS = [300, 36, 36, 110, 95, 95, 58, 75, 80, 120, 80, 150, 70];
 const ADMIN_TOTAL      = ADMIN_COL_WIDTHS.reduce((a, b) => a + b, 0);
 
 function TableColgroup({ showMonths }: { showMonths: boolean }) {
@@ -48,8 +50,8 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
   return (
     <colgroup>
       {ADMIN_COL_WIDTHS.map((w, i) =>
-        // Comments column (index 12) has no fixed width — absorbs extra viewport space.
-        i === 12
+        // Comments column (index 11) has no fixed width — absorbs extra viewport space
+        i === 11
           ? <col key={i} />
           : <col key={i} style={{ width: `${w}px` }} />
       )}
@@ -79,7 +81,7 @@ function lerpColor(hexA: string, hexB: string, t: number): string {
   return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;
 }
 
-export function PlanningTable({ initialRows, showMonths = true, serviceOrders = [], offices = [], soByPlanningId, onSoLink }: PlanningTableProps) {
+export function PlanningTable({ initialRows, showMonths = true, serviceOrders = [], offices = [], soByPlanningId, onSoLink, onSoCreate, onOfficeCreate }: PlanningTableProps) {
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
   const setFilter = (key: string, val: string) => setColFilters((prev) => ({ ...prev, [key]: val }));
   const gf = (key: string) => colFilters[key] ?? "";
@@ -93,6 +95,8 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const [sortKey, setSortKey]   = useState<string | null>(null);
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // Local filter override state: rowId → override (optimistic updates before DB persist)
+  const [filterOverrides, setFilterOverrides] = useState<Record<string, "in" | "out" | null>>({});
 
   const TABLE_STYLE     = showMonths ? PLANNING_TABLE_STYLE : ADMIN_TABLE_STYLE;
   const TABLE_MIN_WIDTH = showMonths
@@ -129,6 +133,12 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
         const av = a.hsStageOrder ?? 9999;
         const bv = b.hsStageOrder ?? 9999;
         const cmp = av - bv;
+        return sortDir === "asc" ? cmp : -cmp;
+      }
+      if (sortKey === "soNo") {
+        const getSoNo = (r: PlanningRow) => soByPlanningId?.get(r.id)?.[0]?.serviceOrderNo ?? "";
+        const av = getSoNo(a), bv = getSoNo(b);
+        const cmp = av < bv ? -1 : av > bv ? 1 : 0;
         return sortDir === "asc" ? cmp : -cmp;
       }
       const av = String((a as unknown as Record<string, unknown>)[sortKey] ?? "");
@@ -175,12 +185,12 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
     );
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
   const ACTIVE_HIDDEN_LABELS = ["Project Closure"];
   const afterActiveFilter = activeOnly
     ? initialRows.filter((r) => {
+        const override = filterOverrides[r.id] ?? r.filterOverride;
+        if (override === "in") return true;
+        if (override === "out") return false;
         if (r.group === "Canceled" && !r.so) return false;
         if (r.hsStageLabel && ACTIVE_HIDDEN_LABELS.includes(r.hsStageLabel)) return false;
         const anchorDate = r.endDate || r.startDate;
@@ -237,8 +247,10 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   }
   const groups = rawGroups.map((g) => ({ ...g, rows: sortRows(g.rows) }));
 
-  // Number of non-name columns after the sticky Name cell (for group header colSpan)
-  const groupColSpan = showMonths ? 6 : 12;
+  // groupColSpan: non-name columns before month cols (used for group header)
+  // Planning: Start, End, Hrs, SO, SO#, Office, Comments, Approved = 8
+  // Admin:    HS, Odoo, Stage, Start, End, Hrs, SO, SO#, Approved, Office, Comments, Filter? = 12
+  const groupColSpan = showMonths ? 8 : 12;
 
   // Build per-group stage rank from all rows (before filtering, so gradient stays stable)
   const stageRankByGroup = new Map<string, number[]>();
@@ -266,6 +278,10 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
     };
   };
 
+  const handleFilterOverrideChange = (rowId: string, val: "in" | "out" | null) => {
+    setFilterOverrides((prev) => ({ ...prev, [rowId]: val }));
+  };
+
   return (
     <div className="flex flex-col gap-2">
 
@@ -282,7 +298,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
               {showMonths && (
                 <tr className="bg-[#202022] text-white" style={{ height: "40px" }}>
                   <th className="sticky left-0 z-[1] bg-[#202022] px-3 py-2 border-r-2 border-gray-600" />
-                  <th colSpan={6} className="border-r-2 border-gray-600" />
+                  <th colSpan={8} className="border-r-2 border-gray-600" />
                   {VISIBLE_MONTHS.map((m, i) => (
                     <th
                       key={m.key}
@@ -351,9 +367,9 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                   </>
                 )}
 
-                {/* Both views: Start, End, EffortHrs, SO */}
+                {/* Both views: Start, End, Hrs, SO */}
                 {(["startDate","endDate","soldHrs","so"] as const).map((key) => {
-                  const labels: Record<string, string> = { startDate: "Start", endDate: "End", soldHrs: "Effort Hrs", so: "SO" };
+                  const labels: Record<string, string> = { startDate: "Start", endDate: "End", soldHrs: "Hrs", so: "SO" };
                   const active = sortKey === key;
                   return (
                     <th key={key} className={`px-2 py-1.5 text-left cursor-pointer select-none hover:text-white transition-colors ${active ? "text-[#FF7700]" : ""}`}
@@ -363,25 +379,47 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                   );
                 })}
 
-                {/* Admin-only: SO# and Confirmation */}
+                {/* Both views: SO# */}
+                <th
+                  className={`px-2 py-1.5 text-left cursor-pointer select-none hover:text-white transition-colors border-l border-gray-700 ${sortKey === "soNo" ? "text-[#FF7700]" : ""}`}
+                  onClick={() => handleSort("soNo")}
+                >
+                  <span className="inline-flex items-center gap-1">SO # {sortIndicator("soNo")}</span>
+                </th>
+
+                {/* Both views: Office */}
+                <th
+                  className={`px-2 py-1.5 text-left cursor-pointer select-none hover:text-white transition-colors ${sortKey === "office" ? "text-[#FF7700]" : ""}`}
+                  onClick={() => handleSort("office")}
+                >
+                  <span className="inline-flex items-center gap-1">Office {sortIndicator("office")}</span>
+                </th>
+
+                {/* Admin-only: Approved, Office(already above), Comments, Filter? */}
                 {!showMonths && (
                   <>
-                    <th className="px-2 py-1.5 text-left border-l border-gray-700">SO #</th>
-                    <th className="px-2 py-1.5 text-left border-l border-gray-700">SO Confirmation</th>
+                    <th
+                      className={`px-2 py-1.5 text-left cursor-pointer select-none hover:text-white transition-colors ${sortKey === "approved" ? "text-[#FF7700]" : ""}`}
+                      onClick={() => handleSort("approved")}
+                    >
+                      <span className="inline-flex items-center gap-1">Approved {sortIndicator("approved")}</span>
+                    </th>
+                    {/* Office already rendered above — skip duplicate */}
+                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Comments</th>
+                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Filter?</th>
                   </>
                 )}
 
-                {/* Planning-only: Comments */}
-                {showMonths && <th className="px-2 py-1.5 text-left">Comments</th>}
-
-                {/* Both views: Approved */}
-                <th className="px-2 py-1.5 text-left">Approved?</th>
-
-                {/* Admin-only: Office, Comments */}
-                {!showMonths && (
+                {/* Planning-only: Comments, Approved */}
+                {showMonths && (
                   <>
-                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Office</th>
-                    <th className="px-2 py-1.5 text-left border-l border-gray-700">Comments</th>
+                    <th className="px-2 py-1.5 text-left">Comments</th>
+                    <th
+                      className={`px-2 py-1.5 text-left cursor-pointer select-none hover:text-white transition-colors ${sortKey === "approved" ? "text-[#FF7700]" : ""}`}
+                      onClick={() => handleSort("approved")}
+                    >
+                      <span className="inline-flex items-center gap-1">Approved {sortIndicator("approved")}</span>
+                    </th>
                   </>
                 )}
 
@@ -440,38 +478,43 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                     </th>
                   );
                 })}
-                {!showMonths && (
-                  <>
-                    <th className="px-2 py-0.5">
-                      <input value={gf("soNo")} onChange={(e) => setFilter("soNo", e.target.value)}
-                        placeholder="SO#…"
-                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
-                    </th>
-                    <th className="px-1 py-0.5" />{/* Confirmation */}
-                  </>
-                )}
-                {showMonths && (
-                  <th className="px-2 py-0.5">
-                    <input value={gf("comments")} onChange={(e) => setFilter("comments", e.target.value)}
-                      placeholder="…"
-                      className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
-                  </th>
-                )}
+                {/* Both views: SO# filter */}
                 <th className="px-2 py-0.5">
-                  <input value={gf("approved")} onChange={(e) => setFilter("approved", e.target.value)}
-                    placeholder="y/n"
+                  <input value={gf("soNo")} onChange={(e) => setFilter("soNo", e.target.value)}
+                    placeholder="SO#…"
+                    className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                </th>
+                {/* Both views: Office filter */}
+                <th className="px-2 py-0.5">
+                  <input value={gf("office")} onChange={(e) => setFilter("office", e.target.value)}
+                    placeholder="Office…"
                     className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
                 </th>
                 {!showMonths && (
                   <>
                     <th className="px-2 py-0.5">
-                      <input value={gf("office")} onChange={(e) => setFilter("office", e.target.value)}
-                        placeholder="Office…"
+                      <input value={gf("approved")} onChange={(e) => setFilter("approved", e.target.value)}
+                        placeholder="y/n"
                         className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
                     </th>
                     <th className="px-2 py-0.5">
                       <input value={gf("comments")} onChange={(e) => setFilter("comments", e.target.value)}
                         placeholder="…"
+                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                    </th>
+                    <th className="px-1 py-0.5" />{/* Filter? — no text filter */}
+                  </>
+                )}
+                {showMonths && (
+                  <>
+                    <th className="px-2 py-0.5">
+                      <input value={gf("comments")} onChange={(e) => setFilter("comments", e.target.value)}
+                        placeholder="…"
+                        className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                    </th>
+                    <th className="px-2 py-0.5">
+                      <input value={gf("approved")} onChange={(e) => setFilter("approved", e.target.value)}
+                        placeholder="y/n"
                         className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
                     </th>
                   </>
@@ -500,7 +543,6 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
       </div>
 
       {/* ── GROUP CARDS ─────────────────────────────────────────────────── */}
-      {/* Outer rounded frame — overflow:hidden clips body area to rounded corners */}
       <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
         <div
           ref={bodyScrollRef}
@@ -571,7 +613,11 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                           offices={offices}
                           linkedSos={soByPlanningId?.get(row.id) ?? []}
                           onSoLink={(newSoId, oldSoId) => onSoLink?.(row.id, newSoId, oldSoId)}
+                          onSoCreate={onSoCreate}
+                          onOfficeCreate={onOfficeCreate}
                           stageStyle={getStageStyle(row.group, row.hsStageOrder)}
+                          filterOverride={filterOverrides[row.id] ?? row.filterOverride}
+                          onFilterOverrideChange={(val) => handleFilterOverrideChange(row.id, val)}
                         />
                       ))}
                     </tbody>

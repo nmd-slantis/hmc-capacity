@@ -24,6 +24,7 @@ export async function GET(
 //   { startDate: string | null }  — Hubspot only
 //   { endDate: string | null }    — Hubspot only
 //   { monthKey: string, monthHours: number }
+//   { filterOverride: "in" | "out" | null }
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -131,12 +132,10 @@ export async function PATCH(
     data.serviceOrderNo = existing.serviceOrderNo;
   }
 
-  if (body.serviceOrderFileUrl !== undefined) {
-    data.serviceOrderFileUrl = body.serviceOrderFileUrl || null;
-    data.serviceOrderFileName = body.serviceOrderFileName || null;
-  } else {
-    data.serviceOrderFileUrl = existing?.serviceOrderFileUrl ?? null;
-    data.serviceOrderFileName = existing?.serviceOrderFileName ?? null;
+  if (body.filterOverride !== undefined) {
+    data.filterOverride = body.filterOverride || null;
+  } else if (existing?.filterOverride !== undefined) {
+    data.filterOverride = existing.filterOverride;
   }
 
   const record = await prisma.manualData.upsert({

@@ -2,7 +2,6 @@ export interface ServiceOrder {
   id: string;
   serviceOrderNo: string | null;
   name: string;
-  color: string | null;
   docusignUrl: string | null;
   projectIds: string[];
   createdAt: string;
@@ -52,7 +51,6 @@ export interface PlanningRow {
   docusignUrl: string | null;
   office: string | null;
   serviceOrderNo: string | null;
-  serviceOrderFileUrl: string | null;
-  serviceOrderFileName: string | null;
+  filterOverride: "in" | "out" | null;  // active filter override
   group: string;              // display group label, used for section headers
 }

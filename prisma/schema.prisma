@@ -25,8 +25,7 @@ model ManualData {
   docusignUrl          String?
   office               String?
   serviceOrderNo       String?
-  serviceOrderFileUrl  String?
-  serviceOrderFileName String?
+  filterOverride       String?   // null | "in" | "out" — active filter override
   soldHrsManual        Boolean   @default(false)
   startDateManual      Boolean   @default(false)
   endDateManual        Boolean   @default(false)
@@ -50,7 +49,6 @@ model ServiceOrder {
   id             String                @id @default(cuid())
   serviceOrderNo String?
   name           String                @default("")
-  color          String?
   docusignUrl    String?
   projects       ServiceOrderProject[]
   createdAt      DateTime              @default(now())

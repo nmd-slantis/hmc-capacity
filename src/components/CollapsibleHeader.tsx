@@ -12,12 +12,15 @@ interface CollapsibleHeaderProps {
 }
 
 const TAB_LABELS: Record<ActiveTab, string> = {
-  "planning":      "Pipeline",
-  "admin":         "Details",
-  "service-orders":"Service Orders",
-  "offices":       "Offices",
-  "users":         "Users",
+  "planning":  "Pipeline",
+  "admin":     "Details",
+  "office":    "Office",
+  "databases": "Databases",
+  "users":     "Users",
 };
+
+const LEFT_TABS: ActiveTab[] = ["planning", "admin", "office"];
+const RIGHT_TABS: ActiveTab[] = ["databases"];
 
 export function CollapsibleHeader({ email, userRole, today, signOut, activeTab, onTabChange }: CollapsibleHeaderProps) {
   return (
@@ -34,7 +37,7 @@ export function CollapsibleHeader({ email, userRole, today, signOut, activeTab, 
 
           {onTabChange && (
             <div className="flex items-center gap-1 ml-2">
-              {(["planning", "admin", "service-orders", "offices", ...(userRole === "admin" ? ["users"] : [])] as ActiveTab[]).map((tab) => (
+              {LEFT_TABS.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => onTabChange(tab)}
@@ -51,14 +54,33 @@ export function CollapsibleHeader({ email, userRole, today, signOut, activeTab, 
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-gray-400">
-          <span className="hidden sm:block">{today}</span>
-          <span className="hidden md:block">{email}</span>
-          <form action={signOut}>
-            <button type="submit" className="text-gray-400 hover:text-white transition-colors">
-              Sign out
-            </button>
-          </form>
+        <div className="flex items-center gap-3">
+          {onTabChange && (
+            <div className="flex items-center gap-1">
+              {([...RIGHT_TABS, ...(userRole === "admin" ? ["users" as ActiveTab] : [])] as ActiveTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => onTabChange(tab)}
+                  className={`text-[11px] font-medium px-2.5 py-0.5 rounded-full border transition-colors ${
+                    activeTab === tab
+                      ? "bg-[#FF7700] text-white border-[#FF7700]"
+                      : "text-[#FF7700] border-[#FF7700]/40 hover:bg-[#FF7700]/10"
+                  }`}
+                >
+                  {TAB_LABELS[tab]}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span className="hidden sm:block">{today}</span>
+            <span className="hidden md:block">{email}</span>
+            <form action={signOut}>
+              <button type="submit" className="text-gray-400 hover:text-white transition-colors">
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </header>

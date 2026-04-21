@@ -3,9 +3,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { EditableCell } from "./EditableCell";
-import { FileUploadCell } from "./FileUploadCell";
 import { SoRelationCell } from "./SoRelationCell";
-import { VISIBLE_MONTHS, hoursToFte, distributeHours } from "@/config/months";
+import { VISIBLE_MONTHS, hoursToFte, distributeHours, getMonthWeekdaysForProject } from "@/config/months";
 import type { PlanningRow, ServiceOrder, Office } from "@/types/planning";
 import { chipTextColor } from "@/lib/color";
 
@@ -16,7 +15,11 @@ interface ProjectRowProps {
   linkedSos?: ServiceOrder[];
   offices?: Office[];
   onSoLink?: (newSoId: string | null, oldSoId: string | null) => void;
+  onSoCreate?: (so: ServiceOrder) => void;
+  onOfficeCreate?: (office: Office) => void;
   stageStyle?: React.CSSProperties;
+  filterOverride?: "in" | "out" | null;
+  onFilterOverrideChange?: (val: "in" | "out" | null) => void;
 }
 
 const GROUP_ROW_CLASS: Record<string, string> = {
@@ -64,21 +67,59 @@ function StageCell({ stageLabel, style }: { stageLabel: string | null; style?: R
   );
 }
 
-function OfficeRelationCell({ rowId, offices, value, onSaved }: {
+function FilterOverrideCell({ rowId, value, onChange }: {
+  rowId: string;
+  value: "in" | "out" | null;
+  onChange: (val: "in" | "out" | null) => void;
+}) {
+  const cycle = async () => {
+    const next = value === null ? "in" : value === "in" ? "out" : null;
+    onChange(next);
+    await fetch(`/api/planning/${rowId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filterOverride: next }),
+    });
+  };
+
+  return (
+    <button
+      onClick={cycle}
+      title="Toggle filter override: nothing → In → Out → nothing"
+      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full transition-colors ${
+        value === "in"
+          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+          : value === "out"
+          ? "bg-rose-100 text-rose-700 hover:bg-rose-200"
+          : "text-gray-300 hover:text-gray-500 hover:bg-gray-100"
+      }`}
+    >
+      {value === "in" ? "In" : value === "out" ? "Out" : "—"}
+    </button>
+  );
+}
+
+function OfficeRelationCell({ rowId, offices, value, onSaved, onOfficeCreate }: {
   rowId: string;
   offices: Office[];
   value: string | null;
   onSaved: (v: string | null) => void;
+  onOfficeCreate?: (office: Office) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0, width: 0 });
   const [mounted, setMounted] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newLabel, setNewLabel] = useState("");
+  const [saving, setSaving] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const labelRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
-  useEffect(() => { if (open) setTimeout(() => searchRef.current?.focus(), 0); }, [open]);
+  useEffect(() => { if (open && !creating) setTimeout(() => searchRef.current?.focus(), 0); }, [open, creating]);
+  useEffect(() => { if (creating) setTimeout(() => labelRef.current?.focus(), 0); }, [creating]);
 
   const filtered = offices.filter((o) =>
     !search || o.label.toLowerCase().includes(search.toLowerCase())
@@ -87,10 +128,11 @@ function OfficeRelationCell({ rowId, offices, value, onSaved }: {
   const openPanel = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) setPanelPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 200) });
+    setCreating(false);
     setOpen(true);
   };
 
-  const close = () => { setOpen(false); setSearch(""); };
+  const close = () => { setOpen(false); setSearch(""); setCreating(false); setNewLabel(""); };
 
   const select = async (label: string | null) => {
     onSaved(label);
@@ -102,60 +144,112 @@ function OfficeRelationCell({ rowId, offices, value, onSaved }: {
     });
   };
 
+  const handleCreate = async () => {
+    if (!newLabel.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/offices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: newLabel.trim() }),
+      });
+      if (res.ok) {
+        const created = await res.json() as Office;
+        onOfficeCreate?.(created);
+        await select(created.label);
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const panel = open && (
     <div
       style={{ position: "fixed", top: panelPos.top, left: panelPos.left, minWidth: panelPos.width, zIndex: 200 }}
       className="bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden"
     >
-      <div className="p-2 border-b border-gray-100">
-        <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search offices…"
-          className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-[#FF7700]" />
-      </div>
-      <div className="max-h-52 overflow-y-auto py-1">
-        {value && (
-          <button onClick={() => select(null)} className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50">
-            — Clear
-          </button>
-        )}
-        {filtered.length === 0 && (
-          <div className="px-3 py-1.5 text-xs text-gray-400">{offices.length === 0 ? "No offices yet" : "No results"}</div>
-        )}
-        {filtered.map((o) => (
-          <button key={o.id} onClick={() => select(o.label)}
-            className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 ${value === o.label ? "text-[#FF7700]" : "text-gray-700"}`}>
-            <span className="w-3 flex-shrink-0 text-[10px]">{value === o.label ? "✓" : ""}</span>
-            {o.label}
-          </button>
-        ))}
-      </div>
+      {!creating ? (
+        <>
+          <div className="p-2 border-b border-gray-100">
+            <input ref={searchRef} value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search offices…"
+              className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:border-[#FF7700]" />
+          </div>
+          <div className="max-h-52 overflow-y-auto py-1">
+            {value && (
+              <button onClick={() => select(null)} className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:bg-gray-50">
+                — Clear
+              </button>
+            )}
+            {filtered.length === 0 && offices.length > 0 && (
+              <div className="px-3 py-1.5 text-xs text-gray-400">No results</div>
+            )}
+            {filtered.map((o) => (
+              <button key={o.id} onClick={() => select(o.label)}
+                className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 ${value === o.label ? "text-[#FF7700]" : "text-gray-700"}`}>
+                {o.color && <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: o.color }} />}
+                <span className="w-3 flex-shrink-0 text-[10px]">{value === o.label ? "✓" : ""}</span>
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <div className="border-t border-gray-100 px-3 py-1.5">
+            <button
+              onClick={() => setCreating(true)}
+              className="text-xs text-[#FF7700] hover:bg-orange-50 w-full text-left px-1 py-1 rounded flex items-center gap-1"
+            >
+              <span className="text-sm leading-none">+</span> New office
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="p-3 flex flex-col gap-2">
+          <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">New Office</div>
+          <input
+            ref={labelRef}
+            value={newLabel}
+            onChange={(e) => setNewLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") setCreating(false); }}
+            placeholder="Office name…"
+            className="text-xs border border-gray-200 rounded px-2 py-1.5 outline-none focus:border-[#FF7700] w-full"
+          />
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setCreating(false)} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">
+              Cancel
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={saving || !newLabel.trim()}
+              className="text-xs bg-[#FF7700] text-white px-3 py-1 rounded-lg hover:opacity-90 disabled:opacity-40"
+            >
+              {saving ? "Saving…" : "Create & Select"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
+  const officeColor = value ? (offices.find((o) => o.label === value)?.color ?? null) : null;
+
   return (
     <>
-      {/* look up color for the selected office */}
-      {(() => {
-        const officeColor = value ? (offices.find((o) => o.label === value)?.color ?? null) : null;
-        return (
-          <button ref={triggerRef} onClick={open ? close : openPanel}
-            className="w-full flex items-center gap-1 text-xs text-left group">
-            {value ? (
-              <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium truncate max-w-full"
-                style={officeColor
-                  ? { backgroundColor: officeColor, color: chipTextColor(officeColor) }
-                  : { backgroundColor: "#e0f2fe", color: "#0369a1" }}
-              >
-                {value}
-              </span>
-            ) : (
-              <span className="flex-1 text-gray-400">—</span>
-            )}
-            <span className="text-gray-400 flex-shrink-0 text-[10px] group-hover:text-gray-600">▾</span>
-          </button>
-        );
-      })()}
+      <button ref={triggerRef} onClick={open ? close : openPanel}
+        className="w-full flex items-center gap-1 text-xs text-left group">
+        {value ? (
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium truncate max-w-full"
+            style={officeColor
+              ? { backgroundColor: officeColor, color: chipTextColor(officeColor) }
+              : { backgroundColor: "#e0f2fe", color: "#0369a1" }}
+          >
+            {value}
+          </span>
+        ) : (
+          <span className="flex-1 text-gray-400">—</span>
+        )}
+        <span className="text-gray-400 flex-shrink-0 text-[10px] group-hover:text-gray-600">▾</span>
+      </button>
       {mounted && createPortal(
         <>{open && <div className="fixed inset-0 z-[199]" onMouseDown={close} />}{panel}</>,
         document.body
@@ -260,7 +354,6 @@ function EditableDateCell({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
-  // Parse MM/DD/YYYY → YYYY-MM-DD; returns null if invalid
   const parseDisplay = (s: string): string | null => {
     const [m, d, y] = s.split("/");
     if (!m || !d || !y || y.length !== 4) return null;
@@ -331,7 +424,7 @@ function EditableDateCell({
   );
 }
 
-export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], linkedSos = [], offices = [], onSoLink, stageStyle }: ProjectRowProps) {
+export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], linkedSos = [], offices = [], onSoLink, onSoCreate, onOfficeCreate, stageStyle, filterOverride, onFilterOverrideChange }: ProjectRowProps) {
   const [row, setRow] = useState<PlanningRow>(initialRow);
 
   const updateField = <K extends keyof PlanningRow>(key: K, value: PlanningRow[K]) =>
@@ -343,6 +436,11 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
     ? distributeHours(row.soldHrs, row.startDate, row.endDate, VISIBLE_MONTHS)
     : {};
 
+  // Per-row weekdays for FTE: hours / (weekdays in month within project dates × 8)
+  const monthWeekdays = (row.startDate && row.endDate)
+    ? getMonthWeekdaysForProject(row.startDate, row.endDate, VISIBLE_MONTHS)
+    : {};
+
   return (
     <tr className={`border-b ${rowClass} hover:brightness-[0.97] transition-all text-xs`}>
       {/* Name — sticky */}
@@ -352,7 +450,7 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
         </span>
       </td>
 
-      {/* Admin-only: HubSpot, Odoo, DocuSign */}
+      {/* Admin-only: HubSpot, Odoo, Stage */}
       {!showMonths && (
         <>
           <td className="px-2 py-2 text-center">
@@ -393,7 +491,7 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
         </>
       )}
 
-      {/* Both views: Start, End, Effort Hrs, SO */}
+      {/* Both views: Start, End, Hrs, SO */}
       <td className="px-2 py-1 whitespace-nowrap">
         <EditableDateCell
           rowId={row.id}
@@ -427,32 +525,29 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
         {row.so ?? ""}
       </td>
 
-      {/* Admin-only: SO # and Confirmation (between SO and Comments) */}
-      {!showMonths && (
-        <>
-          <td className="px-2 py-1 border-l border-gray-200">
-            <SoRelationCell
-              planningId={row.id}
-              serviceOrders={serviceOrders}
-              linkedSoId={linkedSos[0]?.id ?? null}
-              onLink={(newSoId, oldSoId) => onSoLink?.(newSoId, oldSoId)}
-            />
-          </td>
-          <td className="px-2 py-1">
-            <FileUploadCell
-              rowId={row.id}
-              fileUrl={row.serviceOrderFileUrl}
-              fileName={row.serviceOrderFileName}
-              onSaved={(url, name) => {
-                updateField("serviceOrderFileUrl", url);
-                updateField("serviceOrderFileName", name);
-              }}
-            />
-          </td>
-        </>
-      )}
+      {/* Both views: SO # (SoRelationCell) */}
+      <td className="px-2 py-1 border-l border-gray-200">
+        <SoRelationCell
+          planningId={row.id}
+          serviceOrders={serviceOrders}
+          linkedSoId={linkedSos[0]?.id ?? null}
+          onLink={(newSoId, oldSoId) => onSoLink?.(newSoId, oldSoId)}
+          onSoCreate={onSoCreate}
+        />
+      </td>
 
-      {/* Planning-only: Comments (in Details tab it moves to the end) */}
+      {/* Both views: Office */}
+      <td className="px-2 py-1">
+        <OfficeRelationCell
+          rowId={row.id}
+          offices={offices}
+          value={row.office}
+          onSaved={(v) => updateField("office", v)}
+          onOfficeCreate={onOfficeCreate}
+        />
+      </td>
+
+      {/* Planning-only: Comments */}
       {showMonths && (
         <td className="px-2 py-1">
           <EditableCell rowId={row.id} field="comments"
@@ -471,32 +566,33 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
         />
       </td>
 
-      {/* Admin-only: Office */}
+      {/* Admin-only: Comments, Filter? */}
       {!showMonths && (
-        <td className="px-2 py-1">
-          <OfficeRelationCell
-            rowId={row.id}
-            offices={offices}
-            value={row.office}
-            onSaved={(v) => updateField("office", v)}
-          />
-        </td>
-      )}
-
-      {/* Admin-only: Comments (at end in Details tab) */}
-      {!showMonths && (
-        <td className="px-2 py-1">
-          <EditableCell rowId={row.id} field="comments"
-            value={row.comments} type="text"
-            onSaved={(v) => updateField("comments", (v as string | null))}
-            className="text-gray-700 text-xs" placeholder="…" />
-        </td>
+        <>
+          <td className="px-2 py-1">
+            <EditableCell rowId={row.id} field="comments"
+              value={row.comments} type="text"
+              onSaved={(v) => updateField("comments", (v as string | null))}
+              className="text-gray-700 text-xs" placeholder="…" />
+          </td>
+          <td className="px-2 py-1 text-center">
+            <FilterOverrideCell
+              rowId={row.id}
+              value={filterOverride ?? null}
+              onChange={(val) => {
+                updateField("filterOverride", val);
+                onFilterOverrideChange?.(val);
+              }}
+            />
+          </td>
+        </>
       )}
 
       {/* Planning-only: monthly columns */}
       {showMonths && VISIBLE_MONTHS.map((month, i) => {
         const hours = projectedMonthly[month.key] ?? 0;
-        const fte = hours > 0 ? hoursToFte(hours, month.workdayHours) : null;
+        const wd = monthWeekdays[month.key] ?? 0;
+        const fte = hours > 0 && wd > 0 ? hoursToFte(hours, wd * 8) : null;
 
         return (
           <React.Fragment key={month.key}>
@@ -515,7 +611,7 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
           </React.Fragment>
         );
       })}
-      {/* Scrollbar gutter — absorbs header/body width diff when vertical scroll appears */}
+      {/* Scrollbar gutter */}
       <td className="p-0" />
     </tr>
   );

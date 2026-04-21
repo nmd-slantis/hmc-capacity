@@ -20,7 +20,6 @@ export default async function HmcPage() {
     id: so.id,
     serviceOrderNo: so.serviceOrderNo,
     name: so.name,
-    color: so.color,
     docusignUrl: so.docusignUrl,
     projectIds: so.projects.map((p) => p.planningId),
     createdAt: so.createdAt.toISOString(),

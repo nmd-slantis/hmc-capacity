@@ -253,8 +253,7 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       approved: manual?.approved ?? false,
       office: manual?.office ?? null,
       serviceOrderNo: manual?.serviceOrderNo ?? null,
-      serviceOrderFileUrl: manual?.serviceOrderFileUrl ?? null,
-      serviceOrderFileName: manual?.serviceOrderFileName ?? null,
+      filterOverride: (manual?.filterOverride as "in" | "out" | null) ?? null,
       group: hsGroup(hsPipeline, hsStage, hsStageLabel),
     });
   }

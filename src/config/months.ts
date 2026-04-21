@@ -45,7 +45,7 @@ function parseIsoDate(s: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function countWeekdays(start: Date, end: Date): number {
+export function countWeekdays(start: Date, end: Date): number {
   let count = 0;
   const d = new Date(start);
   while (d <= end) {
@@ -54,6 +54,29 @@ function countWeekdays(start: Date, end: Date): number {
     d.setDate(d.getDate() + 1);
   }
   return count;
+}
+
+/** Returns weekdays per month that fall within [startDate, endDate]. Used for per-row FTE. */
+export function getMonthWeekdaysForProject(
+  startDate: string,
+  endDate: string,
+  months: MonthConfig[],
+): Record<string, number> {
+  const projectStart = parseIsoDate(startDate);
+  const projectEnd   = parseIsoDate(endDate);
+  const result: Record<string, number> = {};
+  for (const month of months) {
+    const [abbrev, yy] = month.key.split("-");
+    const m = MONTH_ABBREV[abbrev];
+    if (!m || !yy) continue;
+    const year = 2000 + parseInt(yy);
+    const monthStart = new Date(year, m - 1, 1);
+    const monthEnd   = new Date(year, m, 0);
+    const from = projectStart > monthStart ? projectStart : monthStart;
+    const to   = projectEnd   < monthEnd   ? projectEnd   : monthEnd;
+    result[month.key] = from <= to ? countWeekdays(from, to) : 0;
+  }
+  return result;
 }
 
 /** Distribute soldHrs across months proportionally by weekday count within [startDate, endDate]. */

@@ -3,12 +3,12 @@
 import { useState, useMemo } from "react";
 import { CollapsibleHeader } from "./CollapsibleHeader";
 import { PlanningTable } from "./PlanningTable";
-import { ServiceOrdersTable } from "./ServiceOrdersTable";
-import { OfficesTable } from "./OfficesTable";
+import { DatabasesView } from "./DatabasesView";
+import { OfficeView } from "./OfficeView";
 import { UsersTable } from "./UsersTable";
 import type { PlanningRow, ServiceOrder, Office } from "@/types/planning";
 
-export type ActiveTab = "planning" | "admin" | "service-orders" | "offices" | "users";
+export type ActiveTab = "planning" | "admin" | "office" | "databases" | "users";
 
 interface HmcClientLayoutProps {
   initialRows: PlanningRow[];
@@ -33,7 +33,6 @@ export function HmcClientLayout({
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(initialServiceOrders);
   const [offices, setOffices] = useState<Office[]>(initialOffices);
 
-
   // planningId → SOs linked to that row
   const soByPlanningId = useMemo(() => {
     const map = new Map<string, ServiceOrder[]>();
@@ -55,6 +54,14 @@ export function HmcClientLayout({
     );
   };
 
+  const handleSoCreate = (created: ServiceOrder) => {
+    setServiceOrders((prev) => [...prev, created]);
+  };
+
+  const handleOfficeCreate = (created: Office) => {
+    setOffices((prev) => [...prev, created].sort((a, b) => a.label.localeCompare(b.label)));
+  };
+
   return (
     <>
       <CollapsibleHeader
@@ -68,23 +75,27 @@ export function HmcClientLayout({
       <main className="px-6 py-6 pb-10">
         {activeTab === "users" ? (
           <UsersTable currentUserEmail={email} />
-        ) : activeTab === "offices" ? (
-          <OfficesTable
+        ) : activeTab === "databases" ? (
+          <DatabasesView
+            serviceOrders={serviceOrders}
             offices={offices}
             planningRows={initialRows}
-            onUpdate={(updated) => setOffices((prev) => prev.map((o) => (o.id === updated.id ? updated : o)))}
-            onCreate={(created) => setOffices((prev) => [...prev, created].sort((a, b) => a.label.localeCompare(b.label)))}
-            onDelete={(id) => setOffices((prev) => prev.filter((o) => o.id !== id))}
+            onSoUpdate={(updated) => setServiceOrders((prev) => prev.map((so) => (so.id === updated.id ? updated : so)))}
+            onSoCreate={handleSoCreate}
+            onSoDelete={(id) => setServiceOrders((prev) => prev.filter((so) => so.id !== id))}
+            onOfficeUpdate={(updated) => setOffices((prev) => prev.map((o) => (o.id === updated.id ? updated : o)))}
+            onOfficeCreate={handleOfficeCreate}
+            onOfficeDelete={(id) => setOffices((prev) => prev.filter((o) => o.id !== id))}
           />
-        ) : activeTab === "service-orders" ? (
-          <ServiceOrdersTable
+        ) : activeTab === "office" ? (
+          <OfficeView
+            initialRows={initialRows}
             serviceOrders={serviceOrders}
-            planningRows={initialRows}
-            onUpdate={(updated) =>
-              setServiceOrders((prev) => prev.map((so) => (so.id === updated.id ? updated : so)))
-            }
-            onCreate={(created) => setServiceOrders((prev) => [...prev, created])}
-            onDelete={(id) => setServiceOrders((prev) => prev.filter((so) => so.id !== id))}
+            offices={offices}
+            soByPlanningId={soByPlanningId}
+            onSoLink={handleSoLink}
+            onSoCreate={handleSoCreate}
+            onOfficeCreate={handleOfficeCreate}
           />
         ) : (
           <PlanningTable
@@ -94,6 +105,8 @@ export function HmcClientLayout({
             offices={offices}
             soByPlanningId={soByPlanningId}
             onSoLink={handleSoLink}
+            onSoCreate={handleSoCreate}
+            onOfficeCreate={handleOfficeCreate}
           />
         )}
       </main>
