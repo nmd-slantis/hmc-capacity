@@ -69,6 +69,12 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
   const setFilter = (key: string, val: string) => setColFilters((prev) => ({ ...prev, [key]: val }));
   const gf = (key: string) => colFilters[key] ?? "";
+  const [numericModes, setNumericModes] = useState<Record<string, "=" | ">=" | "<=">>({});
+  const getMode = (key: string): "=" | ">=" | "<=" => numericModes[key] ?? "=";
+  const toggleMode = (key: string) => setNumericModes((prev) => {
+    const cur = prev[key] ?? "=";
+    return { ...prev, [key]: cur === "=" ? ">=" : cur === ">=" ? "<=" : "=" };
+  });
   const [activeOnly, setActiveOnly] = useState(true);
   const [sortKey, setSortKey]   = useState<string | null>(null);
   const [sortDir, setSortDir]   = useState<"asc" | "desc">("asc");
@@ -158,34 +164,53 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  const ACTIVE_HIDDEN_LABELS = ["Project Closure", "Project Canceled", "Project Cancelled"];
   const afterActiveFilter = activeOnly
     ? initialRows.filter((r) => {
         if ((r.group === "Closed Won" || r.group === "Closed Lost") && !r.so) return false;
+        if (r.hsStageLabel && ACTIVE_HIDDEN_LABELS.includes(r.hsStageLabel)) return false;
         if (r.hsStage !== "988280923") return true;
         const end = r.endDate ? new Date(r.endDate) : null;
         return end !== null && end >= today;
       })
     : initialRows;
 
+  const matchWords = (hay: string, q: string) => q.split(/\s+/).filter(Boolean).every(w => hay.includes(w));
+  const matchNum = (val: number | null, q: string, key: string) => {
+    const n = parseFloat(q);
+    if (isNaN(n)) return true;
+    const v = val ?? 0;
+    const m = getMode(key);
+    return m === ">=" ? v >= n : m === "<=" ? v <= n : v === n;
+  };
+
   const filtered = Object.entries(colFilters).reduce((rows, [key, val]) => {
     const q = val.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) => {
       switch (key) {
-        case "name":      return r.name.toLowerCase().includes(q);
-        case "startDate": return fmtDate(r.startDate).includes(q);
-        case "endDate":   return fmtDate(r.endDate).includes(q);
-        case "soldHrs":   return String(r.soldHrs ?? "").includes(q);
-        case "so":        return (r.so ?? "").toLowerCase().includes(q);
-        case "comments":  return (r.comments ?? "").toLowerCase().includes(q);
+        case "name":      return matchWords(r.name.toLowerCase(), q);
+        case "startDate": return matchWords(fmtDate(r.startDate), q);
+        case "endDate":   return matchWords(fmtDate(r.endDate), q);
+        case "soldHrs":   return matchNum(r.soldHrs, q, "soldHrs");
+        case "so":        return matchWords((r.so ?? "").toLowerCase(), q);
+        case "comments":  return matchWords((r.comments ?? "").toLowerCase(), q);
         case "approved":  return q.startsWith("y") ? r.approved : q.startsWith("n") ? !r.approved : true;
-        case "stage":     return (r.hsStageLabel ?? "").toLowerCase().includes(q);
+        case "stage":     return matchWords((r.hsStageLabel ?? "").toLowerCase(), q);
         case "soNo": {
           const linked = soByPlanningId?.get(r.id) ?? [];
-          return linked.some((so) => (so.serviceOrderNo ?? "").toLowerCase().includes(q) || so.name.toLowerCase().includes(q));
+          return linked.some((so) => matchWords((so.serviceOrderNo ?? "").toLowerCase(), q) || matchWords(so.name.toLowerCase(), q));
         }
-        case "office":    return (r.office ?? "").toLowerCase().includes(q);
-        default:          return true;
+        case "office":    return matchWords((r.office ?? "").toLowerCase(), q);
+        default: {
+          if (VISIBLE_MONTHS.some(m => m.key === key)) {
+            const hrs = (r.soldHrs && r.startDate && r.endDate)
+              ? (distributeHours(r.soldHrs, r.startDate, r.endDate, VISIBLE_MONTHS)[key] ?? 0)
+              : 0;
+            return matchNum(hrs, q, key);
+          }
+          return true;
+        }
       }
     });
   }, afterActiveFilter);
@@ -357,13 +382,24 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                     </th>
                   </>
                 )}
-                {(["startDate","endDate","soldHrs","so"] as const).map((key) => (
-                  <th key={key} className="px-2 py-0.5">
-                    <input value={gf(key)} onChange={(e) => setFilter(key, e.target.value)}
-                      placeholder="…"
-                      className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
-                  </th>
-                ))}
+                {(["startDate","endDate","soldHrs","so"] as const).map((key) => {
+                  const isNumeric = key === "soldHrs";
+                  return (
+                    <th key={key} className="px-2 py-0.5">
+                      <div className="flex items-center gap-0.5">
+                        {isNumeric && (
+                          <button onClick={() => toggleMode(key)}
+                            className="text-[9px] text-gray-500 hover:text-[#FF7700] transition-colors flex-shrink-0 w-4 text-center leading-none">
+                            {getMode(key) === "=" ? "=" : getMode(key) === ">=" ? "≥" : "≤"}
+                          </button>
+                        )}
+                        <input value={gf(key)} onChange={(e) => setFilter(key, e.target.value)}
+                          placeholder="…"
+                          className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600" />
+                      </div>
+                    </th>
+                  );
+                })}
                 {!showMonths && (
                   <>
                     <th className="px-2 py-0.5">
@@ -402,8 +438,18 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                 )}
                 {showMonths && VISIBLE_MONTHS.map((m) => (
                   <React.Fragment key={m.key}>
-                    <th className="px-1 py-0.5" />
-                    <th className="px-1 py-0.5" />
+                    <th className="px-0.5 py-0.5">
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={() => toggleMode(m.key)}
+                          className="text-[9px] text-gray-500 hover:text-[#FF7700] transition-colors flex-shrink-0 w-3.5 text-center leading-none">
+                          {getMode(m.key) === "=" ? "=" : getMode(m.key) === ">=" ? "≥" : "≤"}
+                        </button>
+                        <input value={gf(m.key)} onChange={(e) => setFilter(m.key, e.target.value)}
+                          placeholder="…"
+                          className="w-full bg-transparent text-gray-400 text-[10px] outline-none placeholder:text-gray-700 border-b border-transparent focus:border-gray-600 min-w-0" />
+                      </div>
+                    </th>
+                    <th className="px-1 py-0.5" />{/* FTE */}
                   </React.Fragment>
                 ))}
                 <th className="p-0" />{/* gutter */}
