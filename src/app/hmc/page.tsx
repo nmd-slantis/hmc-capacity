@@ -47,6 +47,8 @@ export default async function HmcPage() {
     await signOut({ redirectTo: "/login" });
   };
 
+  const userRole = (session.user as { role?: string }).role;
+
   return (
     <div className="min-h-screen bg-[#f5f5f5]">
       <HmcClientLayout
@@ -54,8 +56,9 @@ export default async function HmcPage() {
         initialServiceOrders={serviceOrders}
         initialOffices={offices}
         email={session.user?.email}
+        userRole={userRole}
         today={today}
-signOut={signOutAction}
+        signOut={signOutAction}
       />
 
       <footer className="px-6 py-4 text-center text-[10px] text-gray-400">

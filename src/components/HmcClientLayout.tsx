@@ -5,15 +5,17 @@ import { CollapsibleHeader } from "./CollapsibleHeader";
 import { PlanningTable } from "./PlanningTable";
 import { ServiceOrdersTable } from "./ServiceOrdersTable";
 import { OfficesTable } from "./OfficesTable";
+import { UsersTable } from "./UsersTable";
 import type { PlanningRow, ServiceOrder, Office } from "@/types/planning";
 
-export type ActiveTab = "planning" | "admin" | "service-orders" | "offices";
+export type ActiveTab = "planning" | "admin" | "service-orders" | "offices" | "users";
 
 interface HmcClientLayoutProps {
   initialRows: PlanningRow[];
   initialServiceOrders: ServiceOrder[];
   initialOffices: Office[];
   email: string | null | undefined;
+  userRole: string | null | undefined;
   today: string;
   signOut: () => Promise<void>;
 }
@@ -23,6 +25,7 @@ export function HmcClientLayout({
   initialServiceOrders,
   initialOffices,
   email,
+  userRole,
   today,
   signOut,
 }: HmcClientLayoutProps) {
@@ -56,13 +59,16 @@ export function HmcClientLayout({
     <>
       <CollapsibleHeader
         email={email}
+        userRole={userRole}
         today={today}
         signOut={signOut}
         activeTab={activeTab}
         onTabChange={setActiveTab}
       />
       <main className="px-6 py-6 pb-10">
-        {activeTab === "offices" ? (
+        {activeTab === "users" ? (
+          <UsersTable currentUserEmail={email} />
+        ) : activeTab === "offices" ? (
           <OfficesTable
             offices={offices}
             planningRows={initialRows}

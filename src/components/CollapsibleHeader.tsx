@@ -4,6 +4,7 @@ import type { ActiveTab } from "./HmcClientLayout";
 
 interface CollapsibleHeaderProps {
   email: string | null | undefined;
+  userRole: string | null | undefined;
   today: string;
   signOut: () => Promise<void>;
   activeTab?: ActiveTab;
@@ -15,9 +16,10 @@ const TAB_LABELS: Record<ActiveTab, string> = {
   "admin":         "Details",
   "service-orders":"Service Orders",
   "offices":       "Offices",
+  "users":         "Users",
 };
 
-export function CollapsibleHeader({ email, today, signOut, activeTab, onTabChange }: CollapsibleHeaderProps) {
+export function CollapsibleHeader({ email, userRole, today, signOut, activeTab, onTabChange }: CollapsibleHeaderProps) {
   return (
     <header className="bg-[#202022] text-white shadow-md">
       <div className="px-6 flex items-center justify-between" style={{ minHeight: "44px" }}>
@@ -32,7 +34,7 @@ export function CollapsibleHeader({ email, today, signOut, activeTab, onTabChang
 
           {onTabChange && (
             <div className="flex items-center gap-1 ml-2">
-              {(["planning", "admin", "service-orders", "offices"] as ActiveTab[]).map((tab) => (
+              {(["planning", "admin", "service-orders", "offices", ...(userRole === "admin" ? ["users"] : [])] as ActiveTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => onTabChange(tab)}
