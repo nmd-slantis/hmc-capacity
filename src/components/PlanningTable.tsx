@@ -36,8 +36,8 @@ const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
 const PLANNING_BASE_WIDTHS = [300, 95, 95, 58, 75, 150, 80];
 const PLANNING_BASE_TOTAL  = PLANNING_BASE_WIDTHS.reduce((a, b) => a + b, 0); // 853
 
-// Admin: Name, HS, Odoo, DS, Stage, Start, End, EffortHrs, SO, SO#, Confirmation, Comments, Approved, Office
-const ADMIN_COL_WIDTHS = [300, 36, 36, 36, 110, 95, 95, 58, 75, 80, 120, 150, 80, 140];
+// Admin: Name, HS, Odoo, Stage, Start, End, EffortHrs, SO, SO#, Confirmation, Comments, Approved, Office
+const ADMIN_COL_WIDTHS = [300, 36, 36, 110, 95, 95, 58, 75, 80, 120, 150, 80, 140];
 const ADMIN_TOTAL      = ADMIN_COL_WIDTHS.reduce((a, b) => a + b, 0);
 
 function TableColgroup({ showMonths }: { showMonths: boolean }) {
@@ -57,9 +57,8 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
   return (
     <colgroup>
       {ADMIN_COL_WIDTHS.map((w, i) =>
-        // Comments column (index 11) has no fixed width — absorbs extra viewport space.
-        // minWidth keeps it at least as wide as in the Planning view.
-        i === 11
+        // Comments column (index 10) has no fixed width — absorbs extra viewport space.
+        i === 10
           ? <col key={i} />
           : <col key={i} style={{ width: `${w}px` }} />
       )}
@@ -174,7 +173,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const groups = rawGroups.map((g) => ({ ...g, rows: sortRows(g.rows) }));
 
   // Number of non-name columns after the sticky Name cell (for group header colSpan)
-  const groupColSpan = showMonths ? 6 : 13;
+  const groupColSpan = showMonths ? 6 : 12;
 
   return (
     <div className="flex flex-col gap-2">
@@ -253,7 +252,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                   )}
                 </th>
 
-                {/* Admin-only: HS, Odoo, DS icons + Stage */}
+                {/* Admin-only: HS, Odoo icons + Stage */}
                 {!showMonths && (
                   <>
                     <th className="px-2 py-1.5 text-center">
@@ -271,12 +270,6 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                       <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline-block" aria-label="Odoo">
                         <circle cx="12" cy="12" r="5.5" fill="none" stroke="white" strokeWidth="2.5" />
                         <circle cx="12" cy="5.5" r="2" fill="white" />
-                      </svg>
-                    </th>
-                    <th className="px-2 py-1.5 text-center">
-                      <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 inline-block" aria-label="DocuSign">
-                        <path d="M3 15 Q6 10 9 15 Q12 20 15 15 L20 9" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                        <circle cx="20.5" cy="8" r="2" fill="white" />
                       </svg>
                     </th>
                     <th className="px-2 py-1.5 text-left">Stage</th>
@@ -339,7 +332,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
       <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
         <div
           ref={bodyScrollRef}
-          style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)", scrollbarGutter: "stable" }}
+          style={{ overflowX: "auto", overflowY: "auto", maxHeight: "calc(100vh - 220px)" }}
         >
           <div style={{ width: "100%", minWidth: TABLE_MIN_WIDTH, paddingBottom: "8px" }}>
 

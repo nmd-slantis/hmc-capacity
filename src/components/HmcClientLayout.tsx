@@ -4,14 +4,16 @@ import { useState, useMemo, useEffect } from "react";
 import { CollapsibleHeader } from "./CollapsibleHeader";
 import { PlanningTable } from "./PlanningTable";
 import { ServiceOrdersTable } from "./ServiceOrdersTable";
+import { OfficesTable } from "./OfficesTable";
 import { prewarmOfficeCache } from "./OfficeDropdown";
-import type { PlanningRow, ServiceOrder } from "@/types/planning";
+import type { PlanningRow, ServiceOrder, Office } from "@/types/planning";
 
-export type ActiveTab = "planning" | "admin" | "service-orders";
+export type ActiveTab = "planning" | "admin" | "service-orders" | "offices";
 
 interface HmcClientLayoutProps {
   initialRows: PlanningRow[];
   initialServiceOrders: ServiceOrder[];
+  initialOffices: Office[];
   email: string | null | undefined;
   today: string;
   rowCount: number;
@@ -21,6 +23,7 @@ interface HmcClientLayoutProps {
 export function HmcClientLayout({
   initialRows,
   initialServiceOrders,
+  initialOffices,
   email,
   today,
   rowCount,
@@ -28,6 +31,7 @@ export function HmcClientLayout({
 }: HmcClientLayoutProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>("planning");
   const [serviceOrders, setServiceOrders] = useState<ServiceOrder[]>(initialServiceOrders);
+  const [offices, setOffices] = useState<Office[]>(initialOffices);
 
   useEffect(() => { prewarmOfficeCache(); }, []);
 
@@ -63,7 +67,15 @@ export function HmcClientLayout({
         onTabChange={setActiveTab}
       />
       <main className="px-6 py-6 pb-10">
-        {activeTab === "service-orders" ? (
+        {activeTab === "offices" ? (
+          <OfficesTable
+            offices={offices}
+            planningRows={initialRows}
+            onUpdate={(updated) => setOffices((prev) => prev.map((o) => (o.id === updated.id ? updated : o)))}
+            onCreate={(created) => setOffices((prev) => [...prev, created].sort((a, b) => a.label.localeCompare(b.label)))}
+            onDelete={(id) => setOffices((prev) => prev.filter((o) => o.id !== id))}
+          />
+        ) : activeTab === "service-orders" ? (
           <ServiceOrdersTable
             serviceOrders={serviceOrders}
             planningRows={initialRows}

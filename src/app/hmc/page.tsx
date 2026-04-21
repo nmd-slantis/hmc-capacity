@@ -10,18 +10,30 @@ export default async function HmcPage() {
   const session = await auth();
   if (!session) redirect("/login");
 
-  const [rows, soData] = await Promise.all([
+  const [rows, soData, officeData] = await Promise.all([
     buildPlanningRows(),
     prisma.serviceOrder.findMany({ include: { projects: true }, orderBy: { createdAt: "asc" } }),
+    prisma.officeOption.findMany({ orderBy: { label: "asc" } }),
   ]);
 
   const serviceOrders = soData.map((so) => ({
     id: so.id,
     serviceOrderNo: so.serviceOrderNo,
     name: so.name,
+    docusignUrl: so.docusignUrl,
     projectIds: so.projects.map((p) => p.planningId),
     createdAt: so.createdAt.toISOString(),
     updatedAt: so.updatedAt.toISOString(),
+  }));
+
+  const offices = officeData.map((o) => ({
+    id: o.id,
+    label: o.label,
+    address: o.address,
+    contactName: o.contactName,
+    contactEmail: o.contactEmail,
+    notes: o.notes,
+    createdAt: o.createdAt.toISOString(),
   }));
 
   const today = new Date().toLocaleDateString("en-US", {
@@ -40,6 +52,7 @@ export default async function HmcPage() {
       <HmcClientLayout
         initialRows={rows}
         initialServiceOrders={serviceOrders}
+        initialOffices={offices}
         email={session.user?.email}
         today={today}
         rowCount={rows.length}

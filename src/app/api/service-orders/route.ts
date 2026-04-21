@@ -4,6 +4,18 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function serializeSo(so: { id: string; serviceOrderNo: string | null; name: string; docusignUrl: string | null; projects: { planningId: string }[]; createdAt: Date; updatedAt: Date }) {
+  return {
+    id: so.id,
+    serviceOrderNo: so.serviceOrderNo,
+    name: so.name,
+    docusignUrl: so.docusignUrl,
+    projectIds: so.projects.map((p) => p.planningId),
+    createdAt: so.createdAt.toISOString(),
+    updatedAt: so.updatedAt.toISOString(),
+  };
+}
+
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -13,16 +25,7 @@ export async function GET() {
     orderBy: { createdAt: "asc" },
   });
 
-  return NextResponse.json(
-    sos.map((so) => ({
-      id: so.id,
-      serviceOrderNo: so.serviceOrderNo,
-      name: so.name,
-      projectIds: so.projects.map((p) => p.planningId),
-      createdAt: so.createdAt.toISOString(),
-      updatedAt: so.updatedAt.toISOString(),
-    }))
-  );
+  return NextResponse.json(sos.map(serializeSo));
 }
 
 export async function POST(req: NextRequest) {
@@ -35,15 +38,5 @@ export async function POST(req: NextRequest) {
     include: { projects: true },
   });
 
-  return NextResponse.json(
-    {
-      id: so.id,
-      serviceOrderNo: so.serviceOrderNo,
-      name: so.name,
-      projectIds: [],
-      createdAt: so.createdAt.toISOString(),
-      updatedAt: so.updatedAt.toISOString(),
-    },
-    { status: 201 }
-  );
+  return NextResponse.json(serializeSo(so), { status: 201 });
 }

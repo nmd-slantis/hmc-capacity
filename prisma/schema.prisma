@@ -27,13 +27,19 @@ model ManualData {
   serviceOrderNo       String?
   serviceOrderFileUrl  String?
   serviceOrderFileName String?
+  startDateManual      Boolean   @default(false)
+  endDateManual        Boolean   @default(false)
   updatedAt            DateTime  @updatedAt
 }
 
 model OfficeOption {
-  id        Int      @id @default(autoincrement())
-  label     String   @unique
-  createdAt DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  label        String   @unique
+  address      String?
+  contactName  String?
+  contactEmail String?
+  notes        String?
+  createdAt    DateTime @default(now())
 }
 
 // ─── Service Orders ──────────────────────────────────────────────────────────
@@ -42,6 +48,7 @@ model ServiceOrder {
   id             String                @id @default(cuid())
   serviceOrderNo String?
   name           String                @default("")
+  docusignUrl    String?
   projects       ServiceOrderProject[]
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt

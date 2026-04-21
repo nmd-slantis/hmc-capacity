@@ -138,13 +138,15 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       const canonicalStartStr = canonicalStart ? dateToIso(canonicalStart) : null;
       const canonicalEndStr   = canonicalEnd   ? dateToIso(canonicalEnd)   : null;
 
-      // Re-seed whenever computed dates differ from stored (overrides stale/epoch values)
-      const needsDateSeed = storedStartStr !== canonicalStartStr || storedEndStr !== canonicalEndStr;
+      // Skip re-seeding dates that have been manually overridden by the user
+      const needsDateSeed =
+        (!existing?.startDateManual && storedStartStr !== canonicalStartStr) ||
+        (!existing?.endDateManual   && storedEndStr   !== canonicalEndStr);
       const needsSoldHrsSeed = existing?.soldHrs == null && !!soData;
       if (!needsDateSeed && !needsSoldHrsSeed) continue;
 
-      const startDate = canonicalStart;
-      const endDate = canonicalEnd;
+      const startDate = existing?.startDateManual ? existing.startDate : canonicalStart;
+      const endDate   = existing?.endDateManual   ? existing.endDate   : canonicalEnd;
 
       let soldHrs = existing?.soldHrs ?? null;
       if (needsSoldHrsSeed && soData) {
@@ -156,6 +158,8 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       const upsertData = {
         id: rowId, source: "hubspot", sourceId: d.id, soSeeded: true,
         soldHrs, startDate, endDate,
+        startDateManual: existing?.startDateManual ?? false,
+        endDateManual: existing?.endDateManual ?? false,
         effort: existing?.effort ?? null,
         monthlyData: existing ? JSON.stringify(existing.monthlyData) : "{}",
       };
@@ -179,15 +183,24 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
     const manual = manualMap.get(id);
     const soData = d.properties.sales_order ? hsSoMap.get(d.properties.sales_order) : undefined;
     const projDates = soData ? getSoProjectDates(soData) : { startDate: null, endDate: null };
-    // Dates: fully live — SO+projects → project dates; SO only → SO date_order / null; no SO → HS project dates / null
-    const startDate: string | null = soData
+    // Live dates from Odoo/HubSpot sources
+    const liveStartDate: string | null = soData
       ? (projDates.startDate
           ? dateToIso(projDates.startDate)
           : (soData.date_order ? String(soData.date_order).substring(0, 10) : null))
       : dateToIso(parseHsDate(d.properties.project_start_date));
-    const endDate: string | null = soData
+    const liveEndDate: string | null = soData
       ? dateToIso(projDates.endDate)
       : dateToIso(parseHsDate(d.properties.project_end_date));
+
+    // Override with manual dates when the user has broken live sync
+    const startDate = (manual?.startDateManual && isValidDate(manual?.startDate))
+      ? dateToIso(manual.startDate)
+      : liveStartDate;
+    const endDate = (manual?.endDateManual && isValidDate(manual?.endDate))
+      ? dateToIso(manual.endDate)
+      : liveEndDate;
+
     const hsPipeline = d.properties.pipeline ?? null;
     const hsStage = d.properties.dealstage ?? null;
 
@@ -197,6 +210,8 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       name: d.properties.dealname,
       startDate,
       endDate,
+      startDateManual: manual?.startDateManual ?? false,
+      endDateManual: manual?.endDateManual ?? false,
       effort: manual?.effort ?? null,
       soldHrs: manual?.soldHrs ?? null,
       so: d.properties.sales_order ?? null,

@@ -2,9 +2,20 @@ export interface ServiceOrder {
   id: string;
   serviceOrderNo: string | null;
   name: string;
+  docusignUrl: string | null;
   projectIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Office {
+  id: number;
+  label: string;
+  address: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
+  notes: string | null;
+  createdAt: string;
 }
 
 export type RowSource = "odoo" | "hubspot";
@@ -17,6 +28,8 @@ export interface PlanningRow {
   name: string;
   startDate: string | null;   // ISO date string (serialized for RSC→client)
   endDate: string | null;     // ISO date string
+  startDateManual: boolean;   // true = user-edited, breaks live Odoo sync
+  endDateManual: boolean;
   effort: number | null;
   soldHrs: number | null;
   so: string | null;          // Sales Order number (Odoo only)

@@ -11,6 +11,13 @@ interface CollapsibleHeaderProps {
   onTabChange?: (tab: ActiveTab) => void;
 }
 
+const TAB_LABELS: Record<ActiveTab, string> = {
+  "planning":      "Pipeline",
+  "admin":         "Details",
+  "service-orders":"Service Orders",
+  "offices":       "Offices",
+};
+
 export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, onTabChange }: CollapsibleHeaderProps) {
   return (
     <header className="bg-[#202022] text-white shadow-md">
@@ -26,7 +33,7 @@ export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, 
 
           {onTabChange && (
             <div className="flex items-center gap-1 ml-2">
-              {(["planning", "admin", "service-orders"] as ActiveTab[]).map((tab) => (
+              {(["planning", "admin", "service-orders", "offices"] as ActiveTab[]).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => onTabChange(tab)}
@@ -36,7 +43,7 @@ export function CollapsibleHeader({ email, today, rowCount, signOut, activeTab, 
                       : "text-[#FF7700] border-[#FF7700]/40 hover:bg-[#FF7700]/10"
                   }`}
                 >
-                  {tab === "planning" ? "Planning" : tab === "admin" ? "Administration" : "Service Orders"}
+                  {TAB_LABELS[tab]}
                 </button>
               ))}
             </div>

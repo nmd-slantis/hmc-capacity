@@ -89,6 +89,14 @@ export async function PATCH(
     data.endDate = existing.endDate;
   }
 
+  data.startDateManual = body.startDateManual !== undefined
+    ? Boolean(body.startDateManual)
+    : (existing?.startDateManual ?? false);
+
+  data.endDateManual = body.endDateManual !== undefined
+    ? Boolean(body.endDateManual)
+    : (existing?.endDateManual ?? false);
+
   if (body.comments !== undefined) {
     data.comments = body.comments || null;
   } else if (existing?.comments !== undefined) {

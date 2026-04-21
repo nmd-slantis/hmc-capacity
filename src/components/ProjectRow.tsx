@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { EditableCell } from "./EditableCell";
 import { OfficeDropdown } from "./OfficeDropdown";
@@ -27,6 +27,12 @@ const GROUP_ROW_CLASS: Record<string, string> = {
   "Closed Lost":      "bg-rose-50 border-rose-200 opacity-70",
   "No Dates":         "bg-white border-gray-100",
 };
+
+function fmtDate(iso: string | null) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-");
+  return `${m}/${d}/${y}`;
+}
 
 function DocuSignMark() {
   return (
@@ -84,6 +90,84 @@ function StageCell({ stageId }: { stageId: string | null }) {
   return <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600">{stageId}</span>;
 }
 
+function EditableDateCell({
+  rowId,
+  field,
+  value,
+  isManual,
+  onSaved,
+}: {
+  rowId: string;
+  field: "startDate" | "endDate";
+  value: string | null;
+  isManual: boolean;
+  onSaved: (v: string | null, manual: boolean) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+
+  const commit = async () => {
+    setEditing(false);
+    const v = draft || null;
+    if (v === value) return;
+    await fetch(`/api/planning/${rowId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: v, [`${field}Manual`]: true }),
+    });
+    onSaved(v, true);
+  };
+
+  const resetToLive = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await fetch(`/api/planning/${rowId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ [field]: null, [`${field}Manual`]: false }),
+    });
+    // Reload so the server re-seeds the live date
+    window.location.reload();
+  };
+
+  if (editing) {
+    return (
+      <input
+        type="date"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") { setDraft(value ?? ""); setEditing(false); }
+        }}
+        className="outline-none bg-white border border-[#FF7700] rounded px-1 py-0.5 text-xs w-28"
+      />
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 group/date">
+      <button
+        onClick={() => { setDraft(value ?? ""); setEditing(true); }}
+        className={`text-left text-xs text-gray-700 hover:text-[#FF7700] transition-colors whitespace-nowrap ${isManual ? "font-bold" : ""}`}
+        title={isManual ? "Manually set — click to edit" : "Click to edit"}
+      >
+        {fmtDate(value) || <span className="text-gray-300">—</span>}
+      </button>
+      {isManual && (
+        <button
+          onClick={resetToLive}
+          className="opacity-0 group-hover/date:opacity-100 text-[9px] text-gray-400 hover:text-[#FF7700] transition-all leading-none"
+          title="Restore live sync from Odoo"
+        >
+          ⟳
+        </button>
+      )}
+    </span>
+  );
+}
+
 export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], linkedSos = [], onSoLink }: ProjectRowProps) {
   const [row, setRow] = useState<PlanningRow>(initialRow);
 
@@ -91,12 +175,6 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
     setRow((prev) => ({ ...prev, [key]: value }));
 
   const rowClass = GROUP_ROW_CLASS[row.group] ?? "bg-white border-gray-100";
-
-  const fmtDate = (iso: string | null) => {
-    if (!iso) return "";
-    const [y, m, d] = iso.split("-");
-    return `${m}/${d}/${y}`;
-  };
 
   const projectedMonthly = (row.soldHrs && row.startDate && row.endDate)
     ? distributeHours(row.soldHrs, row.startDate, row.endDate, VISIBLE_MONTHS)
@@ -146,9 +224,6 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
               <OdooMark />
             </a>
           </td>
-          <td className="px-2 py-2 text-center">
-            <DocuSignCell rowId={row.id} url={row.docusignUrl} onSaved={(v) => updateField("docusignUrl", v)} />
-          </td>
           <td className="px-2 py-1">
             <StageCell stageId={row.hsStage} />
           </td>
@@ -156,11 +231,23 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
       )}
 
       {/* Both views: Start, End, Effort Hrs, SO */}
-      <td className="px-2 py-1 whitespace-nowrap text-gray-700">
-        {fmtDate(row.startDate)}
+      <td className="px-2 py-1 whitespace-nowrap">
+        <EditableDateCell
+          rowId={row.id}
+          field="startDate"
+          value={row.startDate}
+          isManual={row.startDateManual}
+          onSaved={(v, manual) => setRow((prev) => ({ ...prev, startDate: v, startDateManual: manual }))}
+        />
       </td>
-      <td className="px-2 py-1 whitespace-nowrap text-gray-700">
-        {fmtDate(row.endDate)}
+      <td className="px-2 py-1 whitespace-nowrap">
+        <EditableDateCell
+          rowId={row.id}
+          field="endDate"
+          value={row.endDate}
+          isManual={row.endDateManual}
+          onSaved={(v, manual) => setRow((prev) => ({ ...prev, endDate: v, endDateManual: manual }))}
+        />
       </td>
       <td className="px-2 py-1 text-right text-gray-800">
         {row.soldHrs != null && row.soldHrs > 0 ? row.soldHrs : ""}

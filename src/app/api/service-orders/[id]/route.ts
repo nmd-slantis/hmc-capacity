@@ -4,10 +4,22 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function serializeSo(so: { id: string; serviceOrderNo: string | null; name: string; docusignUrl: string | null; projects: { planningId: string }[]; createdAt: Date; updatedAt: Date }) {
+  return {
+    id: so.id,
+    serviceOrderNo: so.serviceOrderNo,
+    name: so.name,
+    docusignUrl: so.docusignUrl,
+    projectIds: so.projects.map((p) => p.planningId),
+    createdAt: so.createdAt.toISOString(),
+    updatedAt: so.updatedAt.toISOString(),
+  };
+}
+
 // PATCH body variants (can combine):
-//   { name?: string, serviceOrderNo?: string | null }   — scalar field update
-//   { addPlanningId: string }                           — link a project
-//   { removePlanningId: string }                        — unlink a project
+//   { name?: string, serviceOrderNo?: string | null, docusignUrl?: string | null }
+//   { addPlanningId: string }   — link a project
+//   { removePlanningId: string } — unlink a project
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -18,12 +30,11 @@ export async function PATCH(
   const body = await req.json();
   const { id } = params;
 
-  // Scalar updates
-  const updateData: { name?: string; serviceOrderNo?: string | null } = {};
+  const updateData: { name?: string; serviceOrderNo?: string | null; docusignUrl?: string | null } = {};
   if (body.name !== undefined) updateData.name = body.name;
   if (body.serviceOrderNo !== undefined) updateData.serviceOrderNo = body.serviceOrderNo || null;
+  if (body.docusignUrl !== undefined) updateData.docusignUrl = body.docusignUrl || null;
 
-  // Link / unlink project
   if (body.addPlanningId) {
     await prisma.serviceOrderProject.upsert({
       where: { serviceOrderId_planningId: { serviceOrderId: id, planningId: body.addPlanningId } },
@@ -43,14 +54,7 @@ export async function PATCH(
     include: { projects: true },
   });
 
-  return NextResponse.json({
-    id: so.id,
-    serviceOrderNo: so.serviceOrderNo,
-    name: so.name,
-    projectIds: so.projects.map((p) => p.planningId),
-    createdAt: so.createdAt.toISOString(),
-    updatedAt: so.updatedAt.toISOString(),
-  });
+  return NextResponse.json(serializeSo(so));
 }
 
 export async function DELETE(
