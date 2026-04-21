@@ -7,22 +7,21 @@ const HS_SERVICE_PIPELINE = "673846910";
 const HS_CLOSED_WON_STAGES = new Set(["closedwon", "969753704"]);
 const HS_CLOSED_LOST_STAGE = "closedlost";
 
-function hsGroup(pipeline: string | null, stage: string | null): string {
-  if (pipeline === HS_SERVICE_PIPELINE) return "Service Pipeline";
-  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Service Pipeline"; // merged with Service Pipeline
-  if (stage === HS_CLOSED_LOST_STAGE) return "Closed Lost";
-  return "Sales Pipeline";
+const PROJECT_CANCELED_LABELS = new Set(["Project Canceled", "Project Cancelled"]);
+
+function hsGroup(pipeline: string | null, stage: string | null, stageLabel?: string | null): string {
+  if (pipeline === HS_SERVICE_PIPELINE) return "Ongoing";
+  if (stage && HS_CLOSED_WON_STAGES.has(stage)) return "Ongoing";
+  if (stage === HS_CLOSED_LOST_STAGE) return "Canceled";
+  if (stageLabel && PROJECT_CANCELED_LABELS.has(stageLabel)) return "Canceled";
+  return "Opportunities";
 }
 
 const GROUP_ORDER: Record<string, number> = {
-  "Ongoing":          0,
-  "Service Pipeline": 1,
-  "To-Do":            2,
-  "Sales Pipeline":   3,
-  "Closed Won":       4,
-  "Completed":        5,
-  "Closed Lost":      6,
-  "No Dates":         7,
+  "Ongoing":       0,
+  "Opportunities": 1,
+  "Canceled":      2,
+  "No Dates":      3,
 };
 
 function computeStatus(start: string | null, end: string | null): RowStatus {
@@ -256,7 +255,7 @@ export async function buildPlanningRows(): Promise<PlanningRow[]> {
       serviceOrderNo: manual?.serviceOrderNo ?? null,
       serviceOrderFileUrl: manual?.serviceOrderFileUrl ?? null,
       serviceOrderFileName: manual?.serviceOrderFileName ?? null,
-      group: hsGroup(hsPipeline, hsStage),
+      group: hsGroup(hsPipeline, hsStage, hsStageLabel),
     });
   }
 

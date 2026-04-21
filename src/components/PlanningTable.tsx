@@ -16,14 +16,10 @@ interface PlanningTableProps {
 }
 
 const GROUP_STYLE: Record<string, { header: string; bullet: string }> = {
-  "Ongoing":          { header: "bg-blue-700 text-white",    bullet: "bg-blue-300"    },
-  "Service Pipeline": { header: "bg-orange-600 text-white",  bullet: "bg-orange-300"  },
-  "To-Do":            { header: "bg-slate-600 text-white",   bullet: "bg-slate-400"   },
-  "Sales Pipeline":   { header: "bg-amber-600 text-white",   bullet: "bg-amber-300"   },
-  "Closed Won":       { header: "bg-emerald-700 text-white", bullet: "bg-emerald-300" },
-  "Completed":        { header: "bg-green-700 text-white",   bullet: "bg-green-300"   },
-  "Closed Lost":      { header: "bg-rose-600 text-white",    bullet: "bg-rose-300"    },
-  "No Dates":         { header: "bg-gray-500 text-white",    bullet: "bg-gray-300"    },
+  "Ongoing":       { header: "bg-orange-600 text-white",  bullet: "bg-orange-300"  },
+  "Opportunities": { header: "bg-amber-600 text-white",   bullet: "bg-amber-300"   },
+  "Canceled":      { header: "bg-rose-600 text-white",    bullet: "bg-rose-300"    },
+  "No Dates":      { header: "bg-gray-500 text-white",    bullet: "bg-gray-300"    },
 };
 
 // Planning: Name, Start, End, EffortHrs, SO, Comments, Approved (no HS/Odoo/DS)
@@ -66,14 +62,10 @@ const PLANNING_TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width:
 const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: "100%", minWidth: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
 
 const GROUP_FULL_COLORS: Record<string, string> = {
-  "Ongoing":          "#1d4ed8",
-  "Service Pipeline": "#ea580c",
-  "To-Do":            "#475569",
-  "Sales Pipeline":   "#d97706",
-  "Closed Won":       "#047857",
-  "Completed":        "#15803d",
-  "Closed Lost":      "#e11d48",
-  "No Dates":         "#6b7280",
+  "Ongoing":       "#ea580c",
+  "Opportunities": "#d97706",
+  "Canceled":      "#e11d48",
+  "No Dates":      "#6b7280",
 };
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -186,10 +178,10 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const ACTIVE_HIDDEN_LABELS = ["Project Closure", "Project Canceled", "Project Cancelled"];
+  const ACTIVE_HIDDEN_LABELS = ["Project Closure"];
   const afterActiveFilter = activeOnly
     ? initialRows.filter((r) => {
-        if (r.group === "Closed Lost" && !r.so) return false;
+        if (r.group === "Canceled" && !r.so) return false;
         if (r.hsStageLabel && ACTIVE_HIDDEN_LABELS.includes(r.hsStageLabel)) return false;
         if (!r.so && r.endDate && new Date(r.endDate).getFullYear() <= 2025) return false;
         return true;

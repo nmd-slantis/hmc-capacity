@@ -19,14 +19,10 @@ interface ProjectRowProps {
 }
 
 const GROUP_ROW_CLASS: Record<string, string> = {
-  "Ongoing":          "bg-blue-100 border-blue-200",
-  "Service Pipeline": "bg-orange-100 border-orange-200",
-  "To-Do":            "bg-slate-100 border-slate-200",
-  "Sales Pipeline":   "bg-amber-100 border-amber-200",
-  "Closed Won":       "bg-emerald-100 border-emerald-200",
-  "Completed":        "bg-green-100 border-green-200",
-  "Closed Lost":      "bg-rose-50 border-rose-200 opacity-70",
-  "No Dates":         "bg-white border-gray-100",
+  "Ongoing":       "bg-orange-50 border-orange-200",
+  "Opportunities": "bg-amber-50 border-amber-200",
+  "Canceled":      "bg-rose-50 border-rose-200 opacity-70",
+  "No Dates":      "bg-white border-gray-100",
 };
 
 function fmtDate(iso: string | null) {
