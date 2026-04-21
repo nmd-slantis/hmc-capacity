@@ -69,11 +69,10 @@ function ApprovedCheckbox({ rowId, checked, onChange }: { rowId: string; checked
   return <input type="checkbox" checked={checked} onChange={(e) => toggle(e.target.checked)} className="w-4 h-4 accent-[#FF7700] cursor-pointer" />;
 }
 
-function OfficeRow({ row, serviceOrders, linkedSos, offices, onSoLink, onSoCreate }: {
+function OfficeRow({ row, serviceOrders, linkedSos, onSoLink, onSoCreate }: {
   row: PlanningRow;
   serviceOrders: ServiceOrder[];
   linkedSos: ServiceOrder[];
-  offices: Office[];
   onSoLink: (newSoId: string | null, oldSoId: string | null) => void;
   onSoCreate?: (so: ServiceOrder) => void;
 }) {
@@ -546,7 +545,6 @@ export function OfficeView({ initialRows, serviceOrders = [], offices = [], soBy
                           row={row}
                           serviceOrders={serviceOrders}
                           linkedSos={soByPlanningId?.get(row.id) ?? []}
-                          offices={offices}
                           onSoLink={(newSoId, oldSoId) => onSoLink?.(row.id, newSoId, oldSoId)}
                           onSoCreate={onSoCreate}
                         />
