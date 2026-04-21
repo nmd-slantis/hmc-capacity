@@ -65,6 +65,28 @@ function TableColgroup({ showMonths }: { showMonths: boolean }) {
 const PLANNING_TABLE_STYLE: React.CSSProperties = { tableLayout: "fixed", width: "100%", borderCollapse: "collapse" };
 const ADMIN_TABLE_STYLE: React.CSSProperties    = { tableLayout: "fixed", width: "100%", minWidth: `${ADMIN_TOTAL}px`, borderCollapse: "collapse" };
 
+const GROUP_FULL_COLORS: Record<string, string> = {
+  "Ongoing":          "#1d4ed8",
+  "Service Pipeline": "#ea580c",
+  "To-Do":            "#475569",
+  "Sales Pipeline":   "#d97706",
+  "Closed Won":       "#047857",
+  "Completed":        "#15803d",
+  "Closed Lost":      "#e11d48",
+  "No Dates":         "#6b7280",
+};
+
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace("#", ""), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function lerpColor(hexA: string, hexB: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(hexA);
+  const [r2, g2, b2] = hexToRgb(hexB);
+  return `rgb(${Math.round(r1+(r2-r1)*t)},${Math.round(g1+(g2-g1)*t)},${Math.round(b1+(b2-b1)*t)})`;
+}
+
 export function PlanningTable({ initialRows, showMonths = true, serviceOrders = [], offices = [], soByPlanningId, onSoLink }: PlanningTableProps) {
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
   const setFilter = (key: string, val: string) => setColFilters((prev) => ({ ...prev, [key]: val }));
@@ -225,6 +247,32 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
 
   // Number of non-name columns after the sticky Name cell (for group header colSpan)
   const groupColSpan = showMonths ? 6 : 12;
+
+  // Build per-group stage rank from all rows (before filtering, so gradient stays stable)
+  const stageRankByGroup = new Map<string, number[]>();
+  {
+    const gs = new Map<string, Set<number>>();
+    for (const r of initialRows) {
+      if (r.hsStageOrder == null) continue;
+      if (!gs.has(r.group)) gs.set(r.group, new Set());
+      gs.get(r.group)!.add(r.hsStageOrder);
+    }
+    gs.forEach((stages, group) => {
+      stageRankByGroup.set(group, Array.from(stages).sort((a, b) => a - b));
+    });
+  }
+
+  const getStageStyle = (group: string, stageOrder: number | null): React.CSSProperties => {
+    const fullColor = GROUP_FULL_COLORS[group];
+    if (!fullColor || stageOrder == null) return { backgroundColor: "#f3f4f6", color: "#6b7280" };
+    const stages = stageRankByGroup.get(group) ?? [];
+    const idx = stages.indexOf(stageOrder);
+    const t = stages.length <= 1 ? 1 : idx === -1 ? 0 : idx / (stages.length - 1);
+    return {
+      backgroundColor: lerpColor("#ffffff", fullColor, t),
+      color: t >= 0.6 ? "#ffffff" : fullColor,
+    };
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -531,6 +579,7 @@ export function PlanningTable({ initialRows, showMonths = true, serviceOrders = 
                           offices={offices}
                           linkedSos={soByPlanningId?.get(row.id) ?? []}
                           onSoLink={(newSoId, oldSoId) => onSoLink?.(row.id, newSoId, oldSoId)}
+                          stageStyle={getStageStyle(row.group, row.hsStageOrder)}
                         />
                       ))}
                     </tbody>

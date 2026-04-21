@@ -15,6 +15,7 @@ interface ProjectRowProps {
   linkedSos?: ServiceOrder[];
   offices?: Office[];
   onSoLink?: (newSoId: string | null, oldSoId: string | null) => void;
+  stageStyle?: React.CSSProperties;
 }
 
 const GROUP_ROW_CLASS: Record<string, string> = {
@@ -57,24 +58,11 @@ function HubSpotMark() {
   );
 }
 
-const HS_STAGE_COLORS: Record<string, string> = {
-  closedwon:             "bg-emerald-100 text-emerald-700",
-  "969753704":           "bg-emerald-100 text-emerald-700",
-  closedlost:            "bg-rose-100 text-rose-600",
-  appointmentscheduled:  "bg-blue-100 text-blue-700",
-  qualifiedtobuy:        "bg-blue-100 text-blue-700",
-  presentationscheduled: "bg-violet-100 text-violet-700",
-  decisionmakerboughtin: "bg-violet-100 text-violet-700",
-  contractsent:          "bg-amber-100 text-amber-700",
-};
-
-function StageCell({ stageId, stageLabel }: { stageId: string | null; stageLabel: string | null }) {
-  const label = stageLabel;
-  if (!label) return <span className="text-gray-400">—</span>;
-  const cls = stageId ? (HS_STAGE_COLORS[stageId] ?? "bg-gray-100 text-gray-600") : "bg-gray-100 text-gray-600";
+function StageCell({ stageLabel, style }: { stageLabel: string | null; style?: React.CSSProperties }) {
+  if (!stageLabel) return <span className="text-gray-400">—</span>;
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium ${cls}`}>
-      {label}
+    <span style={style} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium">
+      {stageLabel}
     </span>
   );
 }
@@ -335,7 +323,7 @@ function EditableDateCell({
   );
 }
 
-export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], linkedSos = [], offices = [], onSoLink }: ProjectRowProps) {
+export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], linkedSos = [], offices = [], onSoLink, stageStyle }: ProjectRowProps) {
   const [row, setRow] = useState<PlanningRow>(initialRow);
 
   const updateField = <K extends keyof PlanningRow>(key: K, value: PlanningRow[K]) =>
@@ -392,7 +380,7 @@ export function ProjectRow({ initialRow, showMonths = true, serviceOrders = [], 
             </a>
           </td>
           <td className="px-2 py-1">
-            <StageCell stageId={row.hsStage} stageLabel={row.hsStageLabel} />
+            <StageCell stageLabel={row.hsStageLabel} style={stageStyle} />
           </td>
         </>
       )}
