@@ -79,6 +79,65 @@ export function getMonthWeekdaysForProject(
   return result;
 }
 
+/**
+ * Distribute soldHrs across months, respecting manual per-month overrides.
+ * Overridden months get their fixed value; remaining hours are distributed
+ * proportionally by weekday count across the non-overridden months.
+ */
+export function distributeWithOverrides(
+  soldHrs: number,
+  startDate: string,
+  endDate: string,
+  overrides: Record<string, number>,
+  months: MonthConfig[],
+): Record<string, number> {
+  const projectStart = parseIsoDate(startDate);
+  const projectEnd   = parseIsoDate(endDate);
+
+  const weekdaysPerMonth: Record<string, number> = {};
+  for (const month of months) {
+    const [abbrev, yy] = month.key.split("-");
+    const m = MONTH_ABBREV[abbrev];
+    if (!m || !yy) continue;
+    const year = 2000 + parseInt(yy);
+    const monthStart = new Date(year, m - 1, 1);
+    const monthEnd   = new Date(year, m, 0);
+    const from = projectStart > monthStart ? projectStart : monthStart;
+    const to   = projectEnd   < monthEnd   ? projectEnd   : monthEnd;
+    weekdaysPerMonth[month.key] = from <= to ? countWeekdays(from, to) : 0;
+  }
+
+  const overriddenTotal = months.reduce((sum, m) => {
+    const v = overrides[m.key];
+    return v != null ? sum + v : sum;
+  }, 0);
+
+  const remaining = Math.max(0, soldHrs - overriddenTotal);
+
+  let nonOverriddenWd = 0;
+  for (const month of months) {
+    if (overrides[month.key] == null) {
+      nonOverriddenWd += weekdaysPerMonth[month.key] ?? 0;
+    }
+  }
+
+  const result: Record<string, number> = {};
+  for (const month of months) {
+    const override = overrides[month.key];
+    if (override != null) {
+      result[month.key] = override;
+    } else if (nonOverriddenWd > 0) {
+      const wd = weekdaysPerMonth[month.key] ?? 0;
+      if (wd > 0) {
+        const hrs = Math.round(remaining * wd / nonOverriddenWd);
+        if (hrs > 0) result[month.key] = hrs;
+      }
+    }
+  }
+
+  return result;
+}
+
 /** Distribute soldHrs across months proportionally by weekday count within [startDate, endDate]. */
 export function distributeHours(
   soldHrs: number,
