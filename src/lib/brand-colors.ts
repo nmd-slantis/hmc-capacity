@@ -1,14 +1,11 @@
 export const BRAND_COLORS = [
-  "#FF7700", // orange — /slantis primary
-  "#1d4ed8", // blue
-  "#047857", // emerald
-  "#7c3aed", // violet
-  "#b45309", // amber
-  "#be123c", // rose
-  "#0e7490", // cyan
-  "#4f46e5", // indigo
-  "#15803d", // green
-  "#9333ea", // purple
+  "#FF7700", // /slantis Orange  — Primary / Future / DFA / B
+  "#FFE900", // Vibrant Yellow   — VIZ
+  "#5BD9D6", // Sky Blue         — ARCH
+  "#44C15D", // Greenie          — TRNG
+  "#F479D1", // Pinky            — BIM
+  "#552497", // Deep Purple      — General / OTHER
+  "#202022", // Blackie          — PM
 ];
 
 export function randomBrandColor(): string {
