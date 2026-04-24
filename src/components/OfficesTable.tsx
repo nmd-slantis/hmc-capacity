@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import type { Office, PlanningRow } from "@/types/planning";
 import { chipTextColor } from "@/lib/color";
+import { BRAND_COLORS } from "@/lib/brand-colors";
 
 interface OfficesTableProps {
   offices: Office[];
@@ -13,34 +15,136 @@ interface OfficesTableProps {
   onOfficesRefresh?: (offices: Office[]) => void;
 }
 
+const CUSTOM_COLORS_KEY = "hmc-custom-colors";
+
+function getStoredColors(): string[] {
+  if (typeof window === "undefined") return [];
+  try { return JSON.parse(localStorage.getItem(CUSTOM_COLORS_KEY) ?? "[]") as string[]; }
+  catch { return []; }
+}
+
+function storeColor(hex: string): string[] {
+  const existing = getStoredColors();
+  if (existing.includes(hex)) return existing;
+  const updated = [hex, ...existing].slice(0, 20);
+  localStorage.setItem(CUSTOM_COLORS_KEY, JSON.stringify(updated));
+  return updated;
+}
+
 function ColorPickerCell({ color, onSave }: { color: string | null; onSave: (v: string) => void }) {
-  const [local, setLocal] = useState(color ?? "#6b7280");
-  const ref = useRef<HTMLInputElement>(null);
-  const pendingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
+  const [customColors, setCustomColors] = useState<string[]>([]);
+  const [pendingCustom, setPendingCustom] = useState(color ?? "#6b7280");
+  const [mounted, setMounted] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const nativeChangedRef = useRef(false);
 
-  useEffect(() => {
-    if (!pendingRef.current) setLocal(color ?? "#6b7280");
-  }, [color]);
+  useEffect(() => { setMounted(true); }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    setLocal(v);
-    if (pendingRef.current) clearTimeout(pendingRef.current);
-    pendingRef.current = setTimeout(() => {
-      pendingRef.current = null;
-      onSave(v);
-    }, 700);
+  const openPanel = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) setPanelPos({ top: rect.bottom + 4, left: rect.left });
+    setCustomColors(getStoredColors());
+    setPendingCustom(color ?? "#6b7280");
+    nativeChangedRef.current = false;
+    setOpen(true);
   };
+
+  const close = () => setOpen(false);
+
+  const select = (hex: string) => { close(); onSave(hex); };
+
+  const handleNativeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPendingCustom(e.target.value);
+    nativeChangedRef.current = true;
+  };
+
+  const handleNativeBlur = () => {
+    if (nativeChangedRef.current) {
+      const updated = storeColor(pendingCustom);
+      setCustomColors(updated);
+      onSave(pendingCustom);
+      nativeChangedRef.current = false;
+    }
+    close();
+  };
+
+  const display = color ?? "#6b7280";
+
+  const panel = open && (
+    <div
+      style={{ position: "fixed", top: panelPos.top, left: panelPos.left, zIndex: 300 }}
+      className="bg-white rounded-xl shadow-xl border border-gray-200 p-3 w-52"
+    >
+      <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2">Brand</div>
+      <div className="grid grid-cols-5 gap-1.5 mb-3">
+        {BRAND_COLORS.map((c) => (
+          <button
+            key={c}
+            onClick={() => select(c)}
+            style={{ backgroundColor: c }}
+            title={c}
+            className={`w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 ${
+              color === c ? "border-gray-700 shadow-sm scale-105" : "border-transparent hover:border-gray-300"
+            }`}
+          />
+        ))}
+      </div>
+      {customColors.length > 0 && (
+        <>
+          <div className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-2">Custom</div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {customColors.map((c) => (
+              <button
+                key={c}
+                onClick={() => select(c)}
+                style={{ backgroundColor: c }}
+                title={c}
+                className={`w-7 h-7 rounded-full hover:scale-110 transition-transform border-2 ${
+                  color === c ? "border-gray-700 shadow-sm scale-105" : "border-transparent hover:border-gray-300"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+      <div className="border-t border-gray-100 pt-2">
+        <label className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-700 cursor-pointer hover:bg-gray-50 px-2 py-1.5 rounded-lg transition-colors">
+          <span
+            className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 flex-shrink-0"
+            style={{ backgroundColor: nativeChangedRef.current ? pendingCustom : undefined }}
+          />
+          <input
+            type="color"
+            value={pendingCustom}
+            onChange={handleNativeChange}
+            onBlur={handleNativeBlur}
+            className="sr-only"
+          />
+          Add custom color…
+        </label>
+      </div>
+    </div>
+  );
 
   return (
     <div className="flex items-center justify-center">
-      <button type="button" onClick={() => ref.current?.click()}
-        title="Pick color"
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={open ? close : openPanel}
+        title={color ?? "Pick color"}
         className="w-5 h-5 rounded-full border-2 hover:scale-110 transition-transform flex-shrink-0"
-        style={{ backgroundColor: local, borderColor: color ? local : "#d1d5db" }} />
-      <input ref={ref} type="color" value={local}
-        onChange={handleChange}
-        className="sr-only" aria-hidden />
+        style={{ backgroundColor: display, borderColor: color ? display : "#d1d5db" }}
+      />
+      {mounted && createPortal(
+        <>
+          {open && <div className="fixed inset-0 z-[299]" onMouseDown={close} />}
+          {panel}
+        </>,
+        document.body
+      )}
     </div>
   );
 }
